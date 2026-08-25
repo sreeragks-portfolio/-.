@@ -65,8 +65,6 @@
     width: 74vw;
     max-width: 310px;
     aspect-ratio: 3 / 4;
-    transform-origin: 50% 8%;
-    animation: mobileBreeze 5.8s ease-in-out infinite;
     border-radius: 1px 2px 2px 1px;
     overflow: hidden;
     box-shadow:
@@ -95,15 +93,6 @@
     background:
       linear-gradient(to right,  rgba(16,14,8,0.09) 0%, transparent 14%, transparent 86%, rgba(16,14,8,0.05) 100%),
       linear-gradient(to bottom, rgba(16,14,8,0.04) 0%, transparent 10%, transparent 85%, rgba(16,14,8,0.10) 100%);
-  }
-  @keyframes mobileBreeze{
-    0%   { transform: rotate(0deg)     translateY(0px)    scale(1.0000); }
-    12%  { transform: rotate(0.65deg)  translateY(-2.5px) scale(1.0008); }
-    28%  { transform: rotate(0.25deg)  translateY(-0.8px) scale(1.0003); }
-    46%  { transform: rotate(-0.50deg) translateY(0.6px)  scale(0.9997); }
-    62%  { transform: rotate(0.40deg)  translateY(-2.0px) scale(1.0005); }
-    78%  { transform: rotate(-0.20deg) translateY(0.4px)  scale(1.0000); }
-    100% { transform: rotate(0deg)     translateY(0px)    scale(1.0000); }
   }
   @media (max-width: 767px){
     #mobile-screen{ display: flex; }
@@ -2900,6 +2889,60 @@
       });
     }
   });
+</script>
+
+<script>
+/* Mobile page — canvas leaf-flutter (strip displacement) */
+(function(){
+  if(window.innerWidth >= 768) return;
+  var card = document.getElementById('mobile-page-card');
+  var imgEl = card && card.querySelector('img');
+  if(!card || !imgEl) return;
+
+  var cv = document.createElement('canvas');
+  cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;';
+  card.insertBefore(cv, imgEl);
+  imgEl.style.opacity = '0';
+
+  var ctx = cv.getContext('2d');
+  var t = 0, raf;
+
+  function render(){
+    var W = cv.width, H = cv.height;
+    if(!W||!H){ raf = requestAnimationFrame(render); return; }
+    ctx.clearRect(0, 0, W, H);
+    t += 0.007;
+    var N = 80, sh = H / N;
+    for(var i = 0; i < N; i++){
+      var p = i / (N - 1);
+      // Multi-frequency organic breeze: like a real page in moving air
+      var wave =
+        Math.sin(t * 1.1  + p * 4.0) * 0.55 +
+        Math.sin(t * 0.65 + p * 2.3) * 0.30 +
+        Math.sin(t * 2.2  + p * 6.5) * 0.10 +
+        Math.sin(t * 0.28 + p * 0.8) * 0.05;
+      // Envelope: near-zero at top (fixed edge), grows toward free bottom
+      var env = Math.pow(p, 0.55) * (1 - p * 0.15);
+      var dx = wave * env * 9;
+      ctx.drawImage(imgEl, 0, i * sh, W, sh + 1, dx, i * sh, W, sh + 1);
+    }
+    raf = requestAnimationFrame(render);
+  }
+
+  function start(){
+    cv.width  = imgEl.naturalWidth  || 400;
+    cv.height = imgEl.naturalHeight || 534;
+    render();
+  }
+
+  if(imgEl.complete && imgEl.naturalWidth > 0){ start(); }
+  else { imgEl.addEventListener('load', start); }
+
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) cancelAnimationFrame(raf);
+    else raf = requestAnimationFrame(render);
+  });
+})();
 </script>
 </body>
 </html>
