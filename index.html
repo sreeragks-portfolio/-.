@@ -2892,94 +2892,151 @@
 </script>
 
 <script>
-/* Mobile page — book-exact breeze, alternating corner curl, no crease shadow */
+/* Mobile page — realistic paper corner-curl, book-exact breeze */
 (function(){
   var screenEl = document.getElementById('mobile-screen');
   if(!screenEl || getComputedStyle(screenEl).display === 'none') return;
   var card = document.getElementById('mobile-page-card');
   var imgEl = card && card.querySelector('img');
   if(!card || !imgEl) return;
+
+  /* Canvas sits under grain/vignette overlays */
   var cv = document.createElement('canvas');
   cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;';
   card.insertBefore(cv, imgEl);
   imgEl.style.opacity = '0';
   var ctx = cv.getContext('2d');
-  var BREEZE_IDLE_MS = 800, BREEZE_LIFT = 0.28, SEED = 1.23;
+
+  /* Breeze constants — identical to the Three.js book */
+  var BREEZE_IDLE_MS = 800;
+  var LIFT = 0.38;   /* max curl corner as fraction of shorter side */
+  var SEED = 1.23;
   var breeze = { active:false, startTime:0, duration:0, cooldownUntil:0 };
-  var breezeStrength = 0, lastActivityTime = performance.now(), raf;
+  var breezeStrength = 0, lastActivity = performance.now(), raf;
   var curSide = 1; /* 1 = bottom-right, -1 = bottom-left */
+
   function lerp(a,b,t){ return a+(b-a)*t; }
+
+  /* Exact wave from the book — oscillates while breezeStrength > 0 */
   function breezeLift01(t, time, seed){
-    return (Math.sin(t*3.0 - time*2.0 + seed)+1)*0.5;
+    return (Math.sin(t*3.0 - time*2.0 + seed) + 1) * 0.5;
   }
+
   function draw(breezeTime){
-    var W=cv.width, H=cv.height;
-    ctx.clearRect(0,0,W,H);
+    var W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+
     var flutter = breezeLift01(1.0, breezeTime, SEED) * breezeStrength;
-    var fm = Math.min(W,H) * BREEZE_LIFT * flutter;
-    if(fm < 2){ ctx.drawImage(imgEl,0,0,W,H); return; }
+    var fm = Math.min(W, H) * LIFT * flutter;
+
+    /* Flat — just draw the image */
+    if(fm < 2){ ctx.drawImage(imgEl, 0, 0, W, H); return; }
+
+    var iR = (curSide === 1);
+    /* Fold-line endpoints */
+    var bx = iR ? W - fm : fm;  /* point on bottom edge */
+    var ry = H - fm;             /* point on right or left edge */
+
+    /* ── 1. Main image clipped to the non-curled region ── */
     ctx.save();
     ctx.beginPath();
-    if(curSide === 1){
-      /* bottom-right curl: clip out bottom-right triangle */
-      var bx=W-fm, ry=H-fm;
+    if(iR){
       ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,ry);
       ctx.lineTo(bx,H); ctx.lineTo(0,H);
     } else {
-      /* bottom-left curl: clip out bottom-left triangle */
-      var bx2=fm, ry2=H-fm;
-      ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,H);
-      ctx.lineTo(bx2,H); ctx.lineTo(0,ry2);
+      ctx.moveTo(W,0); ctx.lineTo(0,0); ctx.lineTo(0,ry);
+      ctx.lineTo(bx,H); ctx.lineTo(W,H);
     }
     ctx.closePath(); ctx.clip();
-    ctx.drawImage(imgEl,0,0,W,H);
+    ctx.drawImage(imgEl, 0, 0, W, H);
+
+    /* ── 2. Shadow the curl casts onto the page ── */
+    /* Gradient goes from crease inward — stays inside clip so it
+       only falls on the visible page, never in the lifted flap area */
+    var sdx = iR ? (bx - fm*0.6) : (bx + fm*0.6);
+    var sg = ctx.createLinearGradient(bx, H, sdx, ry);
+    sg.addColorStop(0,   'rgba(0,0,0,' + (0.30*breezeStrength).toFixed(3) + ')');
+    sg.addColorStop(0.55,'rgba(0,0,0,' + (0.07*breezeStrength).toFixed(3) + ')');
+    sg.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, W, H);
     ctx.restore();
-    /* Crease highlight only — no shadow */
+
+    /* ── 3. Lifted flap — back of the paper ── */
     ctx.save();
-    ctx.globalAlpha = Math.min(1, breezeStrength * 1.5);
     ctx.beginPath();
-    if(curSide === 1){
-      ctx.moveTo(W-fm, H); ctx.lineTo(W, H-fm);
+    if(iR){
+      ctx.moveTo(bx,H); ctx.lineTo(W,ry); ctx.lineTo(W,H);
     } else {
-      ctx.moveTo(fm, H); ctx.lineTo(0, H-fm);
+      ctx.moveTo(bx,H); ctx.lineTo(0,ry); ctx.lineTo(0,H);
     }
-    ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.3; ctx.stroke();
+    ctx.closePath(); ctx.clip();
+
+    /* Paper-back gradient: dark at fold crease → bright at lifted tip */
+    var gx2 = iR ? W : 0;
+    var fg = ctx.createLinearGradient(bx, H, gx2, ry);
+    fg.addColorStop(0,    'rgba(190,185,172,1)');
+    fg.addColorStop(0.18, 'rgba(218,215,207,1)');
+    fg.addColorStop(0.46, 'rgba(240,238,233,1)');
+    fg.addColorStop(0.76, 'rgba(251,250,247,1)');
+    fg.addColorStop(1,    'rgba(255,254,252,1)');
+    ctx.fillStyle = fg;
+    ctx.fill();
+    ctx.restore();
+
+    /* ── 4. Crease highlight (bright edge at the fold) ── */
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, breezeStrength * 2.0);
+    ctx.beginPath();
+    if(iR){ ctx.moveTo(bx,H); ctx.lineTo(W,ry); }
+    else   { ctx.moveTo(bx,H); ctx.lineTo(0,ry); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.80)';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
     ctx.restore();
   }
+
   function frame(){
-    var now=performance.now(), breezeTime=now/1000, idleMs=now-lastActivityTime;
+    var now = performance.now(), t = now/1000;
+    var idle = now - lastActivity;
+
     if(!breeze.active){
-      if(idleMs>BREEZE_IDLE_MS && now>breeze.cooldownUntil){
+      if(idle > BREEZE_IDLE_MS && now > breeze.cooldownUntil){
         curSide = Math.random() < 0.5 ? 1 : -1;
-        breeze.active=true; breeze.startTime=now;
-        breeze.duration=3.6+Math.random()*2.4;
+        breeze.active = true; breeze.startTime = now;
+        breeze.duration = 3.6 + Math.random()*2.4;
       }
     } else {
-      var elapsed=(now-breeze.startTime)/1000;
-      if(elapsed > breeze.duration){
-        breeze.active=false;
-        breeze.cooldownUntil=now+5000+Math.random()*6000;
+      if((now - breeze.startTime)/1000 > breeze.duration){
+        breeze.active = false;
+        breeze.cooldownUntil = now + 5000 + Math.random()*6000;
       }
     }
-    var targetStrength=0;
+
+    var target = 0;
     if(breeze.active){
-      var e=(now-breeze.startTime)/1000;
-      var fadeIn=Math.min(1,e/0.9), fadeOut=Math.min(1,(breeze.duration-e)/1.2);
-      targetStrength=Math.max(0,Math.min(fadeIn,fadeOut));
+      var e = (now - breeze.startTime)/1000;
+      var fi = Math.min(1, e/0.9);
+      var fo = Math.min(1, (breeze.duration - e)/1.2);
+      target = Math.max(0, Math.min(fi, fo));
     }
-    breezeStrength=lerp(breezeStrength,targetStrength,0.08);
-    draw(breezeTime);
-    raf=requestAnimationFrame(frame);
+    breezeStrength = lerp(breezeStrength, target, 0.08);
+    draw(t);
+    raf = requestAnimationFrame(frame);
   }
+
   function start(){
-    cv.width=imgEl.naturalWidth||400; cv.height=imgEl.naturalHeight||534;
-    raf=requestAnimationFrame(frame);
+    cv.width  = imgEl.naturalWidth  || 400;
+    cv.height = imgEl.naturalHeight || 534;
+    raf = requestAnimationFrame(frame);
   }
-  if(imgEl.complete && imgEl.naturalWidth>0){ start(); }
-  else { imgEl.addEventListener('load',start); imgEl.addEventListener('error',start); }
-  document.addEventListener('visibilitychange',function(){
+
+  if(imgEl.complete && imgEl.naturalWidth > 0){ start(); }
+  else { imgEl.addEventListener('load', start); imgEl.addEventListener('error', start); }
+
+  document.addEventListener('visibilitychange', function(){
     if(document.hidden) cancelAnimationFrame(raf);
-    else { lastActivityTime=performance.now(); raf=requestAnimationFrame(frame); }
+    else { lastActivity = performance.now(); raf = requestAnimationFrame(frame); }
   });
 })();
 </script>
