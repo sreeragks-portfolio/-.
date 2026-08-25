@@ -2892,7 +2892,7 @@
 </script>
 
 <script>
-/* Mobile page — breeze corner curl (state machine: flat → lift → hold → settle → flat) */
+/* Mobile page — exact book breeze system ported to corner-curl canvas */
 (function(){
   if(window.innerWidth >= 768) return;
   var card = document.getElementById('mobile-page-card');
@@ -2905,98 +2905,107 @@
   imgEl.style.opacity = '0';
   var ctx = cv.getContext('2d');
 
-  // Easing helpers
-  function easeOut3(x){ return 1 - Math.pow(1-x,3); }
-  function easeInOut3(x){ return x<0.5 ? 4*x*x*x : 1-Math.pow(-2*x+2,3)/2; }
+  // ── Book constants (exact values from book source) ──
+  var BREEZE_IDLE_MS = 2000;   // 2s idle on mobile (book uses 6s — mobile needs less)
+  var BREEZE_LIFT    = 0.30;   // max fold fraction of shorter dim
+  var SEED           = 1.23;   // fixed per-leaf seed
 
-  // State machine
-  var LIFT_T=0.85, HOLD_T=0.28, SETTLE_T=1.5;
-  var state='idle', stateT=0, curl=0, nextBreeze=1.2, lastTS=0, raf;
+  // Book breeze object (exact structure)
+  var breeze = { active:false, startTime:0, duration:0, cooldownUntil:0 };
+  var breezeStrength = 0;  // smoothed value (book's "breeze.strength")
+  var lastActivityTime = performance.now();
+  var raf;
 
-  function tick(dt){
-    switch(state){
-      case 'idle':
-        curl = 0;
-        nextBreeze -= dt;
-        if(nextBreeze<=0){ state='lifting'; stateT=0; }
-        break;
-      case 'lifting':
-        stateT += dt;
-        var p = Math.min(1, stateT/LIFT_T);
-        // Ease-out lift + tiny surface flutter as air catches the page
-        curl = easeOut3(p) + Math.sin(stateT*16)*0.016*p;
-        if(stateT>=LIFT_T){ curl=1; state='held'; stateT=0; }
-        break;
-      case 'held':
-        stateT += dt;
-        // Corner flutters gently at peak — wind still blowing
-        curl = 1 + Math.sin(stateT*8)*0.045 + Math.sin(stateT*13)*0.02;
-        if(stateT>=HOLD_T){ state='settling'; stateT=0; }
-        break;
-      case 'settling':
-        stateT += dt;
-        var p2 = Math.min(1, stateT/SETTLE_T);
-        curl = easeInOut3(1-p2);
-        if(stateT>=SETTLE_T){
-          curl=0; state='idle';
-          nextBreeze = 2.5 + Math.random()*3.5; // 2.5–6 s between breezes
-        }
-        break;
-    }
-    if(curl<0) curl=0;
-    if(curl>1.07) curl=1.07;
+  // Exact book helper
+  function lerp(a,b,t){ return a+(b-a)*t; }
+
+  // Exact book wave function: breezeLift01(t, time, seed)
+  function breezeLift01(t, time, seed){
+    var wave = Math.sin(t*3.0 - time*2.0 + seed);
+    return (wave+1)*0.5; // always 0..1
   }
 
-  function draw(){
+  function draw(breezeTime){
     var W=cv.width, H=cv.height;
     ctx.clearRect(0,0,W,H);
-    var fm = Math.min(W,H)*curl*0.34;
-    if(fm<2){ ctx.drawImage(imgEl,0,0,W,H); return; }
+
+    // Exact book formula: edgeWeight = pow(t, 1.7), t=1 at free corner
+    var flutter = breezeLift01(1.0, breezeTime, SEED) * /* edgeWeight=1.0^1.7= */1.0 * breezeStrength;
+    var fm = Math.min(W,H) * BREEZE_LIFT * flutter;
+
+    if(fm < 2){ ctx.drawImage(imgEl,0,0,W,H); return; }
+
     var bx=W-fm, ry=H-fm;
 
-    // ── Main image, fold triangle EXCLUDED (transparent = site bg shows through) ──
+    // ── Main image clipped; fold triangle transparent → site bg shows through ──
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,ry);
     ctx.lineTo(bx,H); ctx.lineTo(0,H);
     ctx.closePath(); ctx.clip();
     ctx.drawImage(imgEl,0,0,W,H);
-    // Soft shadow along the crease (just on the page, not in the fold area)
-    var a = 0.16 * Math.min(1, curl);
-    var sg = ctx.createLinearGradient(bx+fm*0.06,H-fm*0.06, bx+fm*0.4,H-fm*0.4);
-    sg.addColorStop(0,'rgba(0,0,0,'+a+')');
-    sg.addColorStop(1,'rgba(0,0,0,0)');
+
+    // Shadow near crease (proportional to strength, like book page shadow)
+    var a=(0.18*breezeStrength).toFixed(3);
+    var sg=ctx.createLinearGradient(bx+fm*0.06,H-fm*0.06, bx+fm*0.40,H-fm*0.40);
+    sg.addColorStop(0,'rgba(0,0,0,'+a+')'); sg.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=sg; ctx.fillRect(0,0,W,H);
     ctx.restore();
 
-    // ── Crease highlight — thin bright line at the fold edge ──
+    // Crease highlight
     ctx.save();
-    ctx.globalAlpha = Math.min(1, curl*1.8);
+    ctx.globalAlpha=Math.min(1,breezeStrength*1.6);
     ctx.beginPath(); ctx.moveTo(bx,H); ctx.lineTo(W,ry);
-    ctx.strokeStyle='rgba(255,255,255,0.52)';
-    ctx.lineWidth=1.3; ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.3; ctx.stroke();
     ctx.restore();
   }
 
-  function frame(ts){
-    var dt=lastTS ? Math.min(0.08,(ts-lastTS)/1000) : 0;
-    lastTS=ts;
-    tick(dt); draw();
+  function frame(){
+    var now=performance.now();
+    var breezeTime=now/1000;
+    var idleMs=now-lastActivityTime;
+
+    // ── Exact book gust scheduling ──
+    if(!breeze.active){
+      if(idleMs>BREEZE_IDLE_MS && now>breeze.cooldownUntil){
+        breeze.active=true;
+        breeze.startTime=now;
+        breeze.duration=3.6+Math.random()*2.4; // 3.6–6 s (book exact)
+      }
+    } else {
+      var elapsed=(now-breeze.startTime)/1000;
+      if(elapsed>breeze.duration){
+        breeze.active=false;
+        breeze.cooldownUntil=now+5000+Math.random()*6000; // 5–11 s (book exact)
+      }
+    }
+
+    // ── Exact book fade-in / fade-out envelope ──
+    var targetStrength=0;
+    if(breeze.active){
+      var e=(now-breeze.startTime)/1000;
+      var fadeIn =Math.min(1,e/0.9);        // 0.9 s fade in (book exact)
+      var fadeOut=Math.min(1,(breeze.duration-e)/1.2); // 1.2 s fade out (book exact)
+      targetStrength=Math.max(0,Math.min(fadeIn,fadeOut));
+    }
+    breezeStrength=lerp(breezeStrength,targetStrength,0.08); // lerp 0.08 (book exact)
+
+    draw(breezeTime);
     raf=requestAnimationFrame(frame);
   }
 
   function start(){
-    cv.width  = imgEl.naturalWidth  || 400;
-    cv.height = imgEl.naturalHeight || 534;
+    cv.width =imgEl.naturalWidth ||400;
+    cv.height=imgEl.naturalHeight||534;
     raf=requestAnimationFrame(frame);
   }
 
-  if(imgEl.complete && imgEl.naturalWidth>0){ start(); }
-  else { imgEl.addEventListener('load', start); }
+  if(imgEl.complete&&imgEl.naturalWidth>0){ start(); }
+  else { imgEl.addEventListener('load',start); }
 
   document.addEventListener('visibilitychange',function(){
-    if(document.hidden){ cancelAnimationFrame(raf); lastTS=0; }
-    else raf=requestAnimationFrame(frame);
+    if(document.hidden) cancelAnimationFrame(raf);
+    else { lastActivityTime=performance.now(); raf=requestAnimationFrame(frame); }
   });
 })();
 </script>
