@@ -2892,7 +2892,7 @@
 </script>
 
 <script>
-/* Mobile page — canvas leaf-flutter (strip displacement) */
+/* Mobile page — realistic corner curl (page lift animation) */
 (function(){
   if(window.innerWidth >= 768) return;
   var card = document.getElementById('mobile-page-card');
@@ -2903,29 +2903,81 @@
   cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;';
   card.insertBefore(cv, imgEl);
   imgEl.style.opacity = '0';
-
   var ctx = cv.getContext('2d');
   var t = 0, raf;
 
-  function render(){
+  function drawCurl(curl) {
     var W = cv.width, H = cv.height;
-    if(!W||!H){ raf = requestAnimationFrame(render); return; }
     ctx.clearRect(0, 0, W, H);
-    t += 0.007;
-    var N = 80, sh = H / N;
-    for(var i = 0; i < N; i++){
-      var p = i / (N - 1);
-      // Multi-frequency organic breeze: like a real page in moving air
-      var wave =
-        Math.sin(t * 1.1  + p * 4.0) * 0.55 +
-        Math.sin(t * 0.65 + p * 2.3) * 0.30 +
-        Math.sin(t * 2.2  + p * 6.5) * 0.10 +
-        Math.sin(t * 0.28 + p * 0.8) * 0.05;
-      // Envelope: near-zero at top (fixed edge), grows toward free bottom
-      var env = Math.pow(p, 0.55) * (1 - p * 0.15);
-      var dx = wave * env * 9;
-      ctx.drawImage(imgEl, 0, i * sh, W, sh + 1, dx, i * sh, W, sh + 1);
-    }
+
+    var fm = Math.min(W, H) * curl * 0.38; // fold triangle size
+    if(fm < 4){ ctx.drawImage(imgEl, 0, 0, W, H); return; }
+
+    // Fold line endpoints: (bx, H) on bottom edge → (W, ry) on right edge
+    var bx = W - fm, ry = H - fm;
+
+    // ─── 1. Main page (clipped, fold excluded) ───
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,ry);
+    ctx.lineTo(bx,H); ctx.lineTo(0,H);
+    ctx.closePath(); ctx.clip();
+    ctx.drawImage(imgEl, 0, 0, W, H);
+    // Shadow cast by the lifted corner onto the flat page
+    var sg = ctx.createLinearGradient(bx+fm*0.05, H-fm*0.05, bx+fm*0.5, H-fm*0.5);
+    sg.addColorStop(0,'rgba(0,0,0,0.22)'); sg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = sg; ctx.fillRect(0,0,W,H);
+    ctx.restore();
+
+    // ─── 2. Soft drop-shadow under lifted corner ───
+    ctx.save();
+    var cx = bx + fm*0.45, cy = ry + fm*0.45;
+    var rad = fm * 0.7;
+    var dg = ctx.createRadialGradient(cx,cy,0, cx,cy,rad);
+    dg.addColorStop(0,'rgba(0,0,0,0.28)'); dg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = dg;
+    ctx.beginPath();
+    ctx.moveTo(bx,H); ctx.lineTo(W,ry); ctx.lineTo(bx,ry); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // ─── 3. Back of the curled page ───
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(bx,H); ctx.lineTo(W,ry); ctx.lineTo(bx,ry);
+    ctx.closePath();
+    // Paper back: slightly warm gray gradient (darker at the crease, lighter at tip)
+    var bg = ctx.createLinearGradient(bx,H, bx,ry);
+    bg.addColorStop(0,'#c8c6c2'); bg.addColorStop(0.25,'#dedcda');
+    bg.addColorStop(0.65,'#eeece9'); bg.addColorStop(1,'#f8f7f5');
+    ctx.fillStyle = bg; ctx.fill();
+    // Subtle sheen across back face
+    var sh = ctx.createLinearGradient(bx,H, W,ry);
+    sh.addColorStop(0,'rgba(255,255,255,0.12)'); sh.addColorStop(1,'rgba(255,255,255,0.38)');
+    ctx.fillStyle = sh; ctx.fill();
+    ctx.restore();
+
+    // ─── 4. Crease highlight ───
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(bx,H); ctx.lineTo(W,ry);
+    var cg = ctx.createLinearGradient(bx,H, W,ry);
+    cg.addColorStop(0,'rgba(255,255,255,0.95)');
+    cg.addColorStop(0.5,'rgba(255,255,255,0.60)');
+    cg.addColorStop(1,'rgba(255,255,255,0.15)');
+    ctx.strokeStyle = cg; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.restore();
+  }
+
+  function render(){
+    t += 0.008;
+    // Organic breeze: stays mostly lifted, breathes naturally
+    var curl =
+      0.52
+      + Math.sin(t * 0.75) * 0.20
+      + Math.sin(t * 1.60) * 0.12
+      + Math.sin(t * 0.32) * 0.08;
+    curl = Math.min(1, Math.max(0.06, curl));
+    drawCurl(curl);
     raf = requestAnimationFrame(render);
   }
 
