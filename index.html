@@ -2892,7 +2892,7 @@
 </script>
 
 <script>
-/* Mobile page — realistic paper corner-curl, book-exact breeze */
+/* Mobile page — book breeze, realistic corner-peel */
 (function(){
   var screenEl = document.getElementById('mobile-screen');
   if(!screenEl || getComputedStyle(screenEl).display === 'none') return;
@@ -2900,143 +2900,110 @@
   var imgEl = card && card.querySelector('img');
   if(!card || !imgEl) return;
 
-  /* Canvas sits under grain/vignette overlays */
   var cv = document.createElement('canvas');
   cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;';
   card.insertBefore(cv, imgEl);
   imgEl.style.opacity = '0';
   var ctx = cv.getContext('2d');
 
-  /* Breeze constants — identical to the Three.js book */
-  var BREEZE_IDLE_MS = 800;
-  var LIFT = 0.38;   /* max curl corner as fraction of shorter side */
-  var SEED = 1.23;
+  var BREEZE_IDLE_MS = 800, LIFT = 0.40, SEED = 1.23;
   var breeze = { active:false, startTime:0, duration:0, cooldownUntil:0 };
   var breezeStrength = 0, lastActivity = performance.now(), raf;
-  var curSide = 1; /* 1 = bottom-right, -1 = bottom-left */
+  var curSide = 1;
 
   function lerp(a,b,t){ return a+(b-a)*t; }
-
-  /* Exact wave from the book — oscillates while breezeStrength > 0 */
-  function breezeLift01(t, time, seed){
-    return (Math.sin(t*3.0 - time*2.0 + seed) + 1) * 0.5;
-  }
+  function breezeLift01(t,time,seed){ return (Math.sin(t*3.0-time*2.0+seed)+1)*0.5; }
 
   function draw(breezeTime){
-    var W = cv.width, H = cv.height;
-    ctx.clearRect(0, 0, W, H);
+    var W=cv.width, H=cv.height;
+    ctx.clearRect(0,0,W,H);
+    var flutter=breezeLift01(1.0,breezeTime,SEED)*breezeStrength;
+    var fm=Math.min(W,H)*LIFT*flutter;
+    if(fm<2){ ctx.drawImage(imgEl,0,0,W,H); return; }
+    var iR=(curSide===1);
+    var bx=iR?W-fm:fm, ry=H-fm;
 
-    var flutter = breezeLift01(1.0, breezeTime, SEED) * breezeStrength;
-    var fm = Math.min(W, H) * LIFT * flutter;
-
-    /* Flat — just draw the image */
-    if(fm < 2){ ctx.drawImage(imgEl, 0, 0, W, H); return; }
-
-    var iR = (curSide === 1);
-    /* Fold-line endpoints */
-    var bx = iR ? W - fm : fm;  /* point on bottom edge */
-    var ry = H - fm;             /* point on right or left edge */
-
-    /* ── 1. Main image clipped to the non-curled region ── */
+    /* 1. Image clipped to the flat region */
     ctx.save();
     ctx.beginPath();
-    if(iR){
-      ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,ry);
-      ctx.lineTo(bx,H); ctx.lineTo(0,H);
-    } else {
-      ctx.moveTo(W,0); ctx.lineTo(0,0); ctx.lineTo(0,ry);
-      ctx.lineTo(bx,H); ctx.lineTo(W,H);
-    }
+    if(iR){ctx.moveTo(0,0);ctx.lineTo(W,0);ctx.lineTo(W,ry);ctx.lineTo(bx,H);ctx.lineTo(0,H);}
+    else  {ctx.moveTo(W,0);ctx.lineTo(0,0);ctx.lineTo(0,ry);ctx.lineTo(bx,H);ctx.lineTo(W,H);}
     ctx.closePath(); ctx.clip();
-    ctx.drawImage(imgEl, 0, 0, W, H);
+    ctx.drawImage(imgEl,0,0,W,H);
 
-    /* ── 2. Shadow the curl casts onto the page ── */
-    /* Gradient goes from crease inward — stays inside clip so it
-       only falls on the visible page, never in the lifted flap area */
-    var sdx = iR ? (bx - fm*0.6) : (bx + fm*0.6);
-    var sg = ctx.createLinearGradient(bx, H, sdx, ry);
-    sg.addColorStop(0,   'rgba(0,0,0,' + (0.30*breezeStrength).toFixed(3) + ')');
-    sg.addColorStop(0.55,'rgba(0,0,0,' + (0.07*breezeStrength).toFixed(3) + ')');
-    sg.addColorStop(1,   'rgba(0,0,0,0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, W, H);
+    /* 2. Shadow on page near crease */
+    var sdx=iR?bx-fm*0.52:bx+fm*0.52;
+    var sg=ctx.createLinearGradient(bx,H,sdx,ry);
+    sg.addColorStop(0,'rgba(0,0,0,'+(0.35*breezeStrength).toFixed(3)+')');
+    sg.addColorStop(0.45,'rgba(0,0,0,'+(0.10*breezeStrength).toFixed(3)+')');
+    sg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=sg; ctx.fillRect(0,0,W,H);
     ctx.restore();
 
-    /* ── 3. Lifted flap — back of the paper ── */
+    /* 3. Lifted triangle — canvas is transparent here so site bg (#F8F7F6) shows.
+       Paint only the bent-paper strip along the crease, fading to transparent. */
+    var curlW=fm*0.32;
+    var offX=iR?curlW*0.707:-curlW*0.707, offY=curlW*0.707;
     ctx.save();
     ctx.beginPath();
-    if(iR){
-      ctx.moveTo(bx,H); ctx.lineTo(W,ry); ctx.lineTo(W,H);
-    } else {
-      ctx.moveTo(bx,H); ctx.lineTo(0,ry); ctx.lineTo(0,H);
-    }
+    if(iR){ctx.moveTo(bx,H);ctx.lineTo(W,ry);ctx.lineTo(W,H);}
+    else  {ctx.moveTo(bx,H);ctx.lineTo(0,ry);ctx.lineTo(0,H);}
     ctx.closePath(); ctx.clip();
-
-    /* Paper-back gradient: dark at fold crease → bright at lifted tip */
-    var gx2 = iR ? W : 0;
-    var fg = ctx.createLinearGradient(bx, H, gx2, ry);
-    fg.addColorStop(0,    'rgba(190,185,172,1)');
-    fg.addColorStop(0.18, 'rgba(218,215,207,1)');
-    fg.addColorStop(0.46, 'rgba(240,238,233,1)');
-    fg.addColorStop(0.76, 'rgba(251,250,247,1)');
-    fg.addColorStop(1,    'rgba(255,254,252,1)');
-    ctx.fillStyle = fg;
-    ctx.fill();
+    var bs=breezeStrength.toFixed(3);
+    var cg=ctx.createLinearGradient(bx,H,bx+offX,H+offY);
+    cg.addColorStop(0,'rgba(168,160,147,'+bs+')');
+    cg.addColorStop(0.22,'rgba(210,207,199,'+bs+')');
+    cg.addColorStop(0.55,'rgba(242,240,236,'+(0.5*breezeStrength).toFixed(3)+')');
+    cg.addColorStop(1,'rgba(250,249,246,0)');
+    ctx.fillStyle=cg; ctx.fillRect(0,0,W,H);
     ctx.restore();
 
-    /* ── 4. Crease highlight (bright edge at the fold) ── */
+    /* 4. Crease highlight */
     ctx.save();
-    ctx.globalAlpha = Math.min(1, breezeStrength * 2.0);
+    ctx.globalAlpha=Math.min(1,breezeStrength*2.0);
     ctx.beginPath();
-    if(iR){ ctx.moveTo(bx,H); ctx.lineTo(W,ry); }
-    else   { ctx.moveTo(bx,H); ctx.lineTo(0,ry); }
-    ctx.strokeStyle = 'rgba(255,255,255,0.80)';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
+    if(iR){ctx.moveTo(bx,H);ctx.lineTo(W,ry);}
+    else  {ctx.moveTo(bx,H);ctx.lineTo(0,ry);}
+    ctx.strokeStyle='rgba(255,255,255,0.82)';
+    ctx.lineWidth=1.8; ctx.stroke();
     ctx.restore();
   }
 
   function frame(){
-    var now = performance.now(), t = now/1000;
-    var idle = now - lastActivity;
-
+    var now=performance.now(),t=now/1000,idle=now-lastActivity;
     if(!breeze.active){
-      if(idle > BREEZE_IDLE_MS && now > breeze.cooldownUntil){
-        curSide = Math.random() < 0.5 ? 1 : -1;
-        breeze.active = true; breeze.startTime = now;
-        breeze.duration = 3.6 + Math.random()*2.4;
+      if(idle>BREEZE_IDLE_MS&&now>breeze.cooldownUntil){
+        curSide=Math.random()<0.5?1:-1;
+        breeze.active=true;breeze.startTime=now;
+        breeze.duration=3.6+Math.random()*2.4;
       }
     } else {
-      if((now - breeze.startTime)/1000 > breeze.duration){
-        breeze.active = false;
-        breeze.cooldownUntil = now + 5000 + Math.random()*6000;
+      if((now-breeze.startTime)/1000>breeze.duration){
+        breeze.active=false;
+        breeze.cooldownUntil=now+5000+Math.random()*6000;
       }
     }
-
-    var target = 0;
+    var target=0;
     if(breeze.active){
-      var e = (now - breeze.startTime)/1000;
-      var fi = Math.min(1, e/0.9);
-      var fo = Math.min(1, (breeze.duration - e)/1.2);
-      target = Math.max(0, Math.min(fi, fo));
+      var e=(now-breeze.startTime)/1000;
+      target=Math.max(0,Math.min(e/0.9,(breeze.duration-e)/1.2));
     }
-    breezeStrength = lerp(breezeStrength, target, 0.08);
-    draw(t);
-    raf = requestAnimationFrame(frame);
+    breezeStrength=lerp(breezeStrength,target,0.08);
+    draw(t); raf=requestAnimationFrame(frame);
   }
 
   function start(){
-    cv.width  = imgEl.naturalWidth  || 400;
-    cv.height = imgEl.naturalHeight || 534;
-    raf = requestAnimationFrame(frame);
+    cv.width=imgEl.naturalWidth||400;
+    cv.height=imgEl.naturalHeight||534;
+    raf=requestAnimationFrame(frame);
   }
 
-  if(imgEl.complete && imgEl.naturalWidth > 0){ start(); }
-  else { imgEl.addEventListener('load', start); imgEl.addEventListener('error', start); }
+  if(imgEl.complete&&imgEl.naturalWidth>0){start();}
+  else{imgEl.addEventListener('load',start);imgEl.addEventListener('error',start);}
 
-  document.addEventListener('visibilitychange', function(){
-    if(document.hidden) cancelAnimationFrame(raf);
-    else { lastActivity = performance.now(); raf = requestAnimationFrame(frame); }
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden)cancelAnimationFrame(raf);
+    else{lastActivity=performance.now();raf=requestAnimationFrame(frame);}
   });
 })();
 </script>
