@@ -1,0 +1,2844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sreerag — Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --paper:#F8F7F6; --ink:#1A1A18; --ink-soft:#5B5B57; --signal:#2149C4;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ background:var(--paper); }
+  body{ font-family:'Space Grotesk', sans-serif; }
+
+  #stage{ position:fixed; inset:0; z-index:1; }
+  #stage canvas{ display:block; }
+
+  #antLayer{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+
+  .spacer{ position:relative; z-index:0; }
+
+  .hint{
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%);
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    color:var(--ink-soft); z-index:5; display:flex; flex-direction:column; align-items:center; gap:6px;
+    transition:opacity 0.4s ease; pointer-events:none;
+  }
+  .hint .chev{ animation:bob 1.6s ease-in-out infinite; font-size:14px; }
+  @keyframes bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(6px); } }
+
+  .loading{
+    position:fixed; inset:0; z-index:10; background:var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft);
+    letter-spacing:0.08em; transition:opacity 0.5s ease;
+  }
+
+  footer.end{ position:relative; z-index:0; padding:14vh 8vw 12vh; text-align:center; }
+  footer.end .mono{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce){ .hint .chev{ animation:none; } }
+
+  /* ── MOBILE SCREEN (< 768px): hide book, show static page ── */
+  #mobile-screen{
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: #F1EEE5;
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #mobile-screen img{
+    max-width: 100%; max-height: 100%;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  @media (max-width: 767px){
+    #mobile-screen{ display: flex; }
+    #stage, #antLayer, .hint, #chapterTabs,
+    #scanOverlay, #handContainer, #handDismiss,
+    #nowPlaying, .loading, .spacer, footer.end{ display: none !important; }
+  }
+
+
+  .chapter-tabs{
+    position:fixed; right:0; top:50%; transform:translateY(-50%);
+    z-index:15; display:flex; flex-direction:column; gap:3px;
+  }
+  .chapter-tab{
+    font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing:0.09em;
+    writing-mode:vertical-rl; text-orientation:mixed;
+    background:#EAE6D9; color:#5B5B57; border:1px solid #D3CDB9; border-right:none;
+    padding:14px 6px; cursor:pointer; border-radius:3px 0 0 3px;
+    box-shadow:-2px 2px 5px rgba(20,19,15,0.10);
+    transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease, padding-right 0.18s ease;
+  }
+  .chapter-tab:hover{
+    transform:translateX(-5px);
+    background:#F1EEE1; color:#1A1A18;
+  }
+  .chapter-tab.active{
+    background:#1A1A18; color:#F1EEE5; border-color:#1A1A18;
+    padding-right:10px;
+  }
+  @media (max-width:640px){
+    .chapter-tab{ font-size:9px; padding:10px 5px; }
+  }
+
+  /* ── SCAN button ─────────────────────────────────── */
+  #scanOverlay{
+    position:fixed; bottom:6vh; left:50%; transform:translateX(-50%);
+    z-index:10; pointer-events:none; opacity:0;
+    white-space:nowrap; }
+  #scanBtn{
+    background:transparent; color:rgba(26,26,24,0.6);
+    border:1.5px solid rgba(26,26,24,0.3);
+    font:600 12px "IBM Plex Mono",monospace;
+    letter-spacing:0.18em; padding:13px 36px;
+    cursor:pointer; border-radius:2px;
+    transition:background 0.2s, color 0.2s, border-color 0.2s; }
+  #scanBtn:hover{ background:rgba(26,26,24,0.88); color:#F1EEE5; border-color:rgba(26,26,24,0.88); }
+
+  /* ── Hand scanning container ─────────────────────── */
+  /* JS sets left+top to align phone screen over the QR code via Three.js projection */
+  #handContainer{
+    position:fixed;
+    top:0; left:0;           /* overridden by JS */
+    width:min(70vw, 720px);
+    aspect-ratio: 9913 / 13909;
+    z-index:20; pointer-events:none;
+    transform:translateY(130vh); /* starts below screen */
+    will-change:transform; }
+  #handContainer.scanning{
+    animation:
+      handArrive 0.7s cubic-bezier(0.22,1,0.36,1) forwards,
+      handHover  3.2s 0.7s ease-in-out infinite; }
+  #handContainer.departing{
+    animation: handLeave 0.5s cubic-bezier(0.55,0,1,0.45) forwards; }
+  @keyframes handArrive{
+    from{ transform:translateY(130vh); }
+    to  { transform:translateY(0);     }
+  }
+  @keyframes handHover{
+    0%,100%{ transform:translateY(0); }
+    50%     { transform:translateY(-10px); }
+  }
+  @keyframes handLeave{
+    from{ transform:translateY(0); }
+    to  { transform:translateY(130vh); }
+  }
+  /* The real photo — mix-blend-mode:screen removes pure-black bg,
+     so the book-page QR code shows THROUGH the phone screen naturally */
+  #handImg{
+    width:100%; display:block;
+    pointer-events:none; }
+  /* Camera-app viewfinder overlay, positioned over the phone screen area
+     in the photo (screen occupies ≈ left:21%, top:13%, w:51%, h:40%) */
+  #phoneFx{
+    position:absolute;
+    top:20.7%; left:37.5%; width:27.0%; height:39.7%;
+    pointer-events:none; overflow:hidden; }
+  #musicPlayer.active{ pointer-events:auto; }
+  #musicPlayer.active .mp-btn{ pointer-events:auto; cursor:pointer; }
+  /* realistic camera QR scanner screen */
+  #scanUI{
+    position:absolute; inset:0;
+    background:linear-gradient(180deg,rgba(0,0,0,0.55) 0%,rgba(0,0,0,0.18) 22%,rgba(0,0,0,0.18) 75%,rgba(0,0,0,0.55) 100%);
+    display:flex; flex-direction:column;
+    font-family:system-ui,-apple-system,sans-serif; color:#fff; }
+  #scanUI-statusbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:4% 6% 0; font-size:7px; opacity:.8; flex-shrink:0; letter-spacing:.05em; }
+  #scanUI-clock{
+    display:flex; flex-direction:column; align-items:center;
+    padding:1% 0 0; flex-shrink:0; }
+  #scanUI-clocktime{
+    font-size:22px; font-weight:200; letter-spacing:.02em; line-height:1; }
+  #scanUI-clockdate{
+    font-size:7px; opacity:.7; margin-top:2px; letter-spacing:.06em; }
+  #scanUI-date{
+    text-align:center; font-size:7px; opacity:.72;
+    letter-spacing:.05em; padding:1% 0 0; flex-shrink:0; }
+  #scanUI-label{
+    text-align:center; font-size:6.5px; letter-spacing:.14em;
+    text-transform:uppercase; opacity:.85;
+    padding:2% 0 3%; flex-shrink:0; }
+  #scanUI-vf{
+    flex:1; position:relative; min-height:0; margin:0 8%; }
+  .vf-corner{
+    position:absolute; width:13px; height:13px;
+    border:2px solid rgba(255,255,255,0.92); }
+  .vf-tl{ top:0; left:0;   border-right:none; border-bottom:none; }
+  .vf-tr{ top:0; right:0;  border-left:none;  border-bottom:none; }
+  .vf-bl{ bottom:0; left:0;  border-right:none; border-top:none; }
+  .vf-br{ bottom:0; right:0; border-left:none;  border-top:none; }
+  #scanLine{
+    position:absolute; left:0; right:0; height:1.5px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.75) 30%,rgba(255,255,255,.75) 70%,transparent);
+    box-shadow:0 0 5px rgba(255,255,255,.45);
+    animation:phoneScan 1.8s ease-in-out infinite; }
+  @keyframes phoneScan{
+    0%  { top:0;    opacity:0; }
+    6%  { opacity:1; }
+    94% { opacity:1; }
+    100%{ top:100%; opacity:0; }
+  }
+  #scanUI-bottom{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:4% 14% 6%; flex-shrink:0; }
+  .scanUI-hw-btn{
+    background:rgba(255,255,255,0.18); border:none; border-radius:50%;
+    width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+    color:#fff; cursor:default; padding:0; }
+  /* "scanned!" flash */
+  #scanFlash{
+    position:absolute; inset:0;
+    background:rgba(255,255,255,0.55);
+    opacity:0; pointer-events:none; transition:opacity 0.15s; }
+  #scanFlash.on{ opacity:1; }
+  /* dismiss tap zone (invisible, covers hand) */
+  #handDismiss{
+    position:fixed; left:50%; bottom:0;
+    width:min(50vw,520px); height:80vh;
+    z-index:21; cursor:pointer; display:none; }
+  #handDismiss.active{ display:block; }
+  /* now-playing pill */
+  #nowPlaying{
+    position:fixed; bottom:6vh; left:50%; transform:translateX(-50%);
+    background:transparent; color:rgba(26,26,24,0.6);
+    border:1.5px solid rgba(26,26,24,0.3);
+    font:600 11px "IBM Plex Mono",monospace;
+    letter-spacing:0.16em; padding:11px 28px;
+    border-radius:2px; z-index:22;
+    opacity:0; transition:opacity 0.4s, background 0.2s, color 0.2s, border-color 0.2s;
+    white-space:nowrap; pointer-events:none; }
+  #nowPlaying.show{ opacity:1; pointer-events:auto; }
+  #nowPlaying.show:hover{ background:rgba(26,26,24,0.88); color:#F1EEE5; border-color:rgba(26,26,24,0.88); }
+
+  
+  
+  /* ── Music Player ──────────────────────────────────── */
+  #musicPlayer{
+    display:none; flex-direction:column;
+    position:absolute; inset:0;
+    background:linear-gradient(180deg,#2c2c2c 0%,#1a1a1a 100%);
+    border-radius:4px;
+    overflow:hidden;
+    font-family:system-ui,-apple-system,sans-serif;
+    color:#fff;
+    padding:0;
+  }
+  #musicPlayer.active{ display:flex; pointer-events:auto; }
+  #musicPlayer.active .mp-btn{ pointer-events:auto; cursor:pointer; }
+
+  /* Status bar */
+  #mp-statusbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:3% 5% 1%; font-size:8px; opacity:.6; flex-shrink:0;
+  }
+
+  /* Nav bar */
+  #mp-navbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:0 5% 2%; font-size:9px; font-weight:700; flex-shrink:0;
+  }
+  #mp-back{ cursor:pointer; font-size:11px; opacity:.7; }
+
+  /* Album art — grows to fill space between nav and info */
+  #mp-art{
+    flex:1; min-height:0;
+    display:flex; align-items:center; justify-content:center;
+    padding:4% 0;
+  }
+  #mp-art-circle{
+    width:60%; aspect-ratio:1; border-radius:50%;
+    background:radial-gradient(circle at 40% 35%,#555,#2a2a2a);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 20px rgba(0,0,0,.5);
+    animation:mpSpin 8s linear infinite paused;
+    flex-shrink:0;
+  }
+  #mp-art-circle svg{ width:45%; height:45%; opacity:.85; }
+  #musicPlayer.playing #mp-art-circle{ animation-play-state:running; }
+  @keyframes mpSpin{ to{ transform:rotate(360deg); } }
+
+  /* Song info */
+  #mp-info{
+    text-align:center; padding:0 8% 3%; flex-shrink:0;
+  }
+  #mp-title{ font-size:10px; font-weight:700; margin-bottom:2px; }
+  #mp-sub  { font-size:7px;  opacity:.4; }
+
+  /* Progress */
+  #mp-progress-wrap{ padding:0 8% 2%; flex-shrink:0; }
+  #mp-progress-bar{
+    position:relative; width:100%; height:2px;
+    background:rgba(255,255,255,.2); border-radius:2px;
+    cursor:pointer; margin-bottom:3px; pointer-events:auto;
+  }
+  #mp-progress-fill{
+    height:100%; width:0%; border-radius:2px;
+    background:#fff; pointer-events:none;
+  }
+  #mp-progress-dot{
+    position:absolute; top:50%;
+    left:0%;
+    width:8px; height:8px;
+    background:#fff; border-radius:50%;
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+  }
+  #mp-times{
+    display:flex; justify-content:space-between;
+    font-size:6px; opacity:.45;
+  }
+
+  /* Controls — bottom */
+  #mp-controls{
+    display:flex; justify-content:center; align-items:center;
+    gap:10%; padding:2% 12% 6%;
+    flex-shrink:0;
+  }
+  .mp-btn{
+    background:none; border:none;
+    padding:0; display:flex; align-items:center; justify-content:center;
+    color:#fff; opacity:.85; -webkit-tap-highlight-color:transparent;
+  }
+  .mp-btn svg{ width:18px; height:18px; display:block; }
+  .mp-playbtn{
+    background:rgba(255,255,255,.12);
+    border-radius:50%;
+    padding:8px;
+    border:1px solid rgba(255,255,255,.25);
+    opacity:1;
+  }
+  .mp-playbtn svg{ width:20px; height:20px; }
+
+  </style>
+</head>
+<body>
+
+<!-- Mobile screen — shown only on phones (< 768px), replaces the book -->
+<div id="mobile-screen">
+  <img src="assets/images/mobile-page.png" alt="Portfolio — Sreerag">
+</div>
+
+<div class="loading" id="loading">PREPARING THE BOOK&hellip;</div>
+<div id="stage"></div>
+<canvas id="antLayer" aria-hidden="true"></canvas>
+<div class="hint" id="hint"><span>SCROLL TO OPEN</span><span class="chev">&#8595;</span></div>
+
+<nav class="chapter-tabs" id="chapterTabs"></nav>
+
+
+<div id="scanOverlay">
+  <button id="scanBtn" onclick="triggerScan()">&#9654;&nbsp; SCAN</button>
+</div>
+
+<div id="handContainer">
+  <div id="phoneFx">
+    <!-- Scanner UI -->
+    <div id="scanUI">
+      <!-- status bar -->
+      <div id="scanUI-statusbar">
+        <span id="scanUI-time">9:41</span>
+        <span>&#9646;&#9646;&#9646;&thinsp;&#9650;</span>
+      </div>
+      <div id="scanUI-date">Sunday, 23 Aug</div>
+      <!-- label -->
+      <div id="scanUI-label">Find a QR Code</div>
+      <!-- viewfinder box -->
+      <div id="scanUI-vf">
+        <div class="vf-corner vf-tl"></div>
+        <div class="vf-corner vf-tr"></div>
+        <div class="vf-corner vf-bl"></div>
+        <div class="vf-corner vf-br"></div>
+        <div id="scanLine"></div>
+      </div>
+      <!-- bottom toolbar -->
+      <div id="scanUI-bottom">
+        <button class="scanUI-hw-btn" title="Torch">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </button>
+        <button class="scanUI-hw-btn" title="Gallery">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </button>
+      </div>
+      <div id="scanFlash"></div>
+    </div>
+    <!-- Music Player UI (shown after scan) -->
+    <div id="musicPlayer">
+      <div id="mp-statusbar">
+        <span id="mp-statusbar-time">12:00</span>
+        <span>&#9646;&#9646;&#9646; &#9650;</span>
+      </div>
+      <div id="mp-navbar">
+        <span id="mp-back" onclick="window.closeHandOverlay()" style="cursor:pointer">&#8592;</span>
+        <span id="mp-navtitle">Music Player</span>
+        <span id="mp-close" onclick="window.closeHandOverlay()" style="cursor:pointer;opacity:.7">&#10005;</span>
+      </div>
+      <div id="mp-art">
+        <div id="mp-art-circle">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 18V6l12-2v12" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="6" cy="18" r="3" stroke="white" stroke-width="1.8"/>
+            <circle cx="18" cy="16" r="3" stroke="white" stroke-width="1.8"/>
+          </svg>
+        </div>
+      </div>
+      <div id="mp-info">
+        <div id="mp-title">Sreerag KS</div>
+        <div id="mp-sub">Portfolio Audio</div>
+      </div>
+      <div id="mp-progress-wrap">
+        <div id="mp-progress-bar">
+          <div id="mp-progress-fill"></div>
+          <div id="mp-progress-dot"></div>
+        </div>
+        <div id="mp-times">
+          <span id="mp-cur">0:00</span>
+          <span id="mp-dur">0:00</span>
+        </div>
+      </div>
+      <div id="mp-controls">
+        <button class="mp-btn" id="mp-prev-btn" onclick="window.mpPrev()">
+          <svg viewBox="0 0 24 24" fill="white"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        </button>
+        <button class="mp-btn mp-playbtn" id="mp-playbtn" onclick="window.mpToggle()">
+          <svg id="mp-play-icon" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="mp-pause-icon" viewBox="0 0 24 24" fill="white" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="mp-btn" id="mp-next-btn" onclick="window.mpNext()">
+          <svg viewBox="0 0 24 24" fill="white"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+      </div>
+    </div>
+    </div>
+  <img id="handImg" src="assets/images/hand.png" alt=""/>
+</div>
+<div id="handDismiss" onclick="window.closeHandOverlay()"></div>
+<div id="nowPlaying" onclick="window.closeHandOverlay()" style="cursor:pointer">&#10005;&#160;&#160;CLOSE</div>
+<audio id="bookAudio" src="assets/audio/music.mp3" preload="none"></audio>
+
+<div class="spacer" id="spacer"></div>
+<footer class="end"><p class="mono">END OF BOOK — SCROLL UP TO READ AGAIN</p></footer>
+
+<script>
+(function(){
+
+  // Skip all Three.js / book init on mobile — the #mobile-screen div handles it
+  if(window.innerWidth < 768){ return; }
+
+  // ---------- content ----------
+  var PAGES = [
+    { front: {}, back: {} },  // leaf 0  — cover
+    { front: {}, back: {} },  // leaf 1  — page-01 / page-02
+    { front: {}, back: {} },  // leaf 2  — page-03 / page-04
+    { front: {}, back: {} },  // leaf 3  — page-3a / page-3b  ← NEW
+    { front: {}, back: {} },  // leaf 4  — page-05 / page-06
+    { front: {}, back: {} },  // leaf 5  — page-07 / page-08
+    { front: {}, back: {} },  // leaf 6  — page-09 / page-10
+    { front: {}, back: {} },  // leaf 7  — page-11 / page-12
+    { front: {}, back: {} },  // leaf 8  — page-13 / page-14
+    { front: {}, back: {} },  // leaf 9  — page-15 / page-16
+    { front: {}, back: {} },  // leaf 10 — page-17 / page-18
+    { front: {}, back: {} },  // leaf 11 — page-19 / page-20
+    { front: {}, back: {} },  // leaf 12 — page-21 / page-22
+    { front: {}, back: {} },  // leaf 13 — page-23 / page-24
+    { front: {}, back: {} },  // leaf 14 — page-25 / page-26
+    { front: {}, back: {} },  // leaf 15 — page-27 / page-28
+    { front: {}, back: {} },  // leaf 16 — page-29 / QR (page-30)
+    { front: {}, back: {} },  // leaf 17 — page-31 / page-32
+    { front: {}, back: {} }   // leaf 18 — back cover
+  ];
+
+  var L = PAGES.length;
+  var PAUSE = 0.6;
+  var TOTAL_UNITS = L + PAUSE * 2;
+  var EASE = 0.15;
+  var EASE_COVER = 0.22;
+  var SEG_X = 32;
+  var PAGE_W = 1.5;
+  var PAGE_H = 2.0;
+  var BEND_AMP = 0.26;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- wind breeze: idle-triggered paper flutter ----------
+  // Only kicks in once the visitor has left the page alone for a while --
+  // the book shouldn't ever fidget while someone is actually scrolling or
+  // reading. Any real interaction (scroll, click, drag, key, touch) resets
+  // the idle clock immediately and fades an in-progress gust out fast.
+  var BREEZE_IDLE_SECONDS = 6;      // seconds of no interaction before wind can pick up
+  var BREEZE_LIFT = 0.34;           // world-unit z-lift at the free (outer) edge at full gust strength (one-directional, see breezeLift01)
+  var BREEZE_CURL = 0.17;           // extra inward curl at the free edge, as a fraction of PAGE_W
+  var breeze = {
+    active: false,
+    startTime: 0,
+    duration: 0,
+    cooldownUntil: 0,
+    strength: 0   // eased 0..1 envelope actually applied -- smoothed so a gust starting/stopping never pops
+  };
+  // The exposed-pair gate below (breezeStrengthR/L) is a hard on/off: it
+  // reads as 0 the instant a leaf's turn crosses past resting-flat, so that
+  // a buried/turning page never bends. That's correct as a target, but
+  // applying it raw, frame to frame, meant the visible curl amplitude could
+  // fall from full strength to zero in a single frame -- e.g. the reader
+  // resumes scrolling while a gust is still fluttering the front page, it
+  // starts turning, and the flutter vanished instantly instead of settling
+  // out, which read as a pop/glitch right on the page being viewed. Same
+  // "never pops" rule as breeze.strength itself, just applied to the gate:
+  var breezeSmooth = { R: 0, L: 0 };
+  var lastActivityTime = performance.now();
+  function markPageActivity(){ lastActivityTime = performance.now(); }
+  ['mousemove','mousedown','wheel','touchstart','touchmove','keydown','scroll'].forEach(function(evt){
+    window.addEventListener(evt, markPageActivity, { passive: true });
+  });
+
+  var loadingEl = document.getElementById('loading');
+  var hintEl = document.getElementById('hint');
+  var spacerEl = document.getElementById('spacer');
+  var stageEl = document.getElementById('stage');
+
+  var SCROLL_SCALE = 1.7;
+
+  // Cached alongside the DOM write so the render loop (60x/sec) never has
+  // to read spacerEl.offsetHeight back -- that's a layout-forcing read, and
+  // doing it every animation frame while WebGL is also rendering every
+  // frame was a real source of scroll stutter.
+  var spacerHeight = 0;
+  function layoutSpacer(){
+    spacerHeight = TOTAL_UNITS * window.innerHeight * SCROLL_SCALE;
+    spacerEl.style.height = spacerHeight + 'px';
+  }
+  layoutSpacer();
+
+  // ---------- canvas texture builder ----------
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+    var words = text.split(' ');
+    var line = '';
+    for(var n = 0; n < words.length; n++){
+      var test = line + words[n] + ' ';
+      if(ctx.measureText(test).width > maxWidth && n > 0){
+        ctx.fillText(line, x, y);
+        line = words[n] + ' ';
+        y += lineHeight;
+      } else {
+        line = test;
+      }
+    }
+    ctx.fillText(line, x, y);
+    return y + lineHeight;
+  }
+
+  function dottedLine(ctx, x1, x2, y){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(26,26,24,0.28)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([1, 7]);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Calibrated against a real photographed open-book spread: the shadow
+  // pooled in the gutter reaches roughly 20% width of the page (not a thin
+  // sliver at the very edge), the darkest point sits right at the crease
+  // itself, and the paper just past that crease catches a soft highlight
+  // where it curves up out of the fold before settling back to ambient --
+  // that catch-light is what makes a flat, painted-on gutter shadow read as
+  // a genuinely creased sheet of paper instead of a flat drawn line.
+  function drawGutterShadow(ctx, w, h, spineSide){
+    // A single smooth, gradual falloff -- no hard edge and no separate
+    // bright band fighting it. The earlier version paired a dark stripe
+    // with an adjacent bright "catch light" stripe, and that hard light/
+    // dark pairing right next to each other was exactly what read as an
+    // artificial seam and pulled the eye straight to it. A real page
+    // crease is soft: darkest right at the fold, fading out smoothly with
+    // no sharp transitions anywhere in between.
+    var gw = w * 0.16;
+    var edgeX = spineSide === 'left' ? 0 : w;
+    var farX = spineSide === 'left' ? gw : w - gw;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    var grad = ctx.createLinearGradient(edgeX, 0, farX, 0);
+    grad.addColorStop(0,    'rgba(20,19,16,0.15)');
+    grad.addColorStop(0.06, 'rgba(20,19,16,0.13)');
+    grad.addColorStop(0.16, 'rgba(20,19,16,0.09)');
+    grad.addColorStop(0.32, 'rgba(20,19,16,0.05)');
+    grad.addColorStop(0.55, 'rgba(20,19,16,0.02)');
+    grad.addColorStop(1,    'rgba(20,19,16,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(spineSide === 'left' ? 0 : w - gw, 0, gw, h);
+    ctx.restore();
+  }
+
+  // A soft, gentle falloff across the whole page -- brighter near the
+  // spine, dimming slightly toward the fore-edge and bottom -- plus a thin
+  // contact shadow along the fore-edge where the leaf meets the edge of the
+  // book block. On its own this is barely visible, but combined with the
+  // gutter shadow above it's what keeps a page from reading as a flat,
+  // evenly-lit rectangle.
+  function paintPageVignette(ctx, w, h, spineSide){
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+
+    var vgrad = ctx.createLinearGradient(0, 0, 0, h);
+    vgrad.addColorStop(0,   'rgba(18,17,14,0.02)');
+    vgrad.addColorStop(0.5, 'rgba(18,17,14,0)');
+    vgrad.addColorStop(1,   'rgba(18,17,14,0.06)');
+    ctx.fillStyle = vgrad;
+    ctx.fillRect(0, 0, w, h);
+
+    var foreW = w * 0.045;
+    var fgrad;
+    if(spineSide === 'left'){
+      fgrad = ctx.createLinearGradient(w - foreW, 0, w, 0);
+      fgrad.addColorStop(0, 'rgba(18,17,14,0)');
+      fgrad.addColorStop(1, 'rgba(18,17,14,0.08)');
+      ctx.fillStyle = fgrad;
+      ctx.fillRect(w - foreW, 0, foreW, h);
+    } else {
+      fgrad = ctx.createLinearGradient(foreW, 0, 0, 0);
+      fgrad.addColorStop(0, 'rgba(18,17,14,0)');
+      fgrad.addColorStop(1, 'rgba(18,17,14,0.08)');
+      ctx.fillStyle = fgrad;
+      ctx.fillRect(0, 0, foreW, h);
+    }
+    ctx.restore();
+  }
+
+  function clamp255(v){ return v < 0 ? 0 : (v > 255 ? 255 : v); }
+
+  function paintPaperGrain(ctx, w, h){
+    var img = ctx.getImageData(0, 0, w, h);
+    var d = img.data;
+    for(var p = 0; p < d.length; p += 4){
+      var n = (Math.random() - 0.5) * 9;
+      var cool = (Math.random() - 0.5) * 3;
+      d[p]   = clamp255(d[p]   + n - cool * 0.6);
+      d[p+1] = clamp255(d[p+1] + n - cool * 0.1);
+      d[p+2] = clamp255(d[p+2] + n + cool * 1.1);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function makeTexture(content, spineSide){
+    var w = 2048, h = Math.round(2048 * (PAGE_H / PAGE_W));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+
+    var ink = '#1A1A18';
+    var inkSoft = '#5B5B57';
+    var pad = w * 0.09;
+
+    ctx.fillStyle = '#F1EEE5';
+    ctx.fillRect(0, 0, w, h);
+    paintPaperGrain(ctx, w, h);
+
+    // ---------- cover ----------
+    if(content.type === 'cover'){
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      ctx.fillText(content.label || '', pad, h*0.08);
+      if(content.volume){
+        var vw = ctx.measureText(content.volume).width;
+        ctx.fillText(content.volume, w - pad - vw, h*0.08);
+      }
+
+      ctx.fillStyle = ink;
+      var titleSize = Math.round(w * 0.09);
+      ctx.font = '400 ' + titleSize + 'px "Fraunces", serif';
+      ctx.fillText(content.title, pad, h*0.5);
+
+      ctx.strokeStyle = 'rgba(26,26,24,0.2)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pad, h*0.54);
+      ctx.lineTo(pad + w*0.14, h*0.54);
+      ctx.stroke();
+      return finish(canvas);
+    }
+
+    // ---------- contents ----------
+    if(content.type === 'contents'){
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      ctx.fillText(content.label || '', pad, h*0.075);
+
+      ctx.fillStyle = ink;
+      ctx.font = '400 ' + Math.round(w*0.072) + 'px "Fraunces", serif';
+      ctx.fillText('Contents', pad, h*0.175);
+
+      var rowY = h*0.26;
+      var rowGap = (h*0.68) / content.rows.length;
+      content.rows.forEach(function(row){
+        ctx.fillStyle = inkSoft;
+        ctx.font = '500 ' + Math.round(w*0.024) + 'px "IBM Plex Mono", monospace';
+        ctx.fillText(row.n, pad, rowY);
+
+        ctx.fillStyle = ink;
+        ctx.font = '400 ' + Math.round(w*0.033) + 'px "Fraunces", serif';
+        ctx.fillText(row.title, pad + w*0.08, rowY);
+
+        ctx.fillStyle = inkSoft;
+        ctx.font = '400 ' + Math.round(w*0.02) + 'px "Space Grotesk", sans-serif';
+        ctx.fillText(row.sub, pad + w*0.08, rowY + h*0.032);
+
+        ctx.font = '400 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+        var pnW = ctx.measureText(row.page).width;
+        ctx.fillStyle = inkSoft;
+        ctx.fillText(row.page, w - pad - pnW, rowY);
+
+        dottedLine(ctx, pad, w - pad, rowY + h*0.05);
+
+        rowY += rowGap;
+      });
+
+      if(content.foot){
+        ctx.fillStyle = inkSoft;
+        ctx.font = '400 ' + Math.round(w*0.017) + 'px "IBM Plex Mono", monospace';
+        ctx.fillText(content.foot, pad, h*0.955);
+      }
+      return finish(canvas);
+    }
+
+    // ---------- photo panel ----------
+    if(content.type === 'photo'){
+      var px = w*0.09, py = h*0.09, pw = w*0.82, ph = h*0.52;
+      var grad = ctx.createLinearGradient(px, py, px+pw*0.6, py+ph);
+      grad.addColorStop(0, '#2A2A28');
+      grad.addColorStop(0.45, '#8B8A82');
+      grad.addColorStop(0.7, '#3C3B38');
+      grad.addColorStop(1, '#171715');
+      ctx.fillStyle = grad;
+      ctx.fillRect(px, py, pw, ph);
+
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = '#FAFAF8';
+      for(var s=0; s<3; s++){
+        ctx.beginPath();
+        var bx = px + pw*(0.15 + s*0.22);
+        ctx.moveTo(bx, py);
+        ctx.lineTo(bx + pw*0.1, py);
+        ctx.lineTo(bx - pw*0.05, py+ph);
+        ctx.lineTo(bx - pw*0.15, py+ph);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.fillStyle = inkSoft;
+      ctx.font = '400 ' + Math.round(w*0.026) + 'px "Space Grotesk", sans-serif';
+      wrapText(ctx, content.caption, px, py+ph+h*0.075, pw*0.72, h*0.036);
+
+      ctx.strokeStyle = inkSoft;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(px, py+ph+h*0.23);
+      ctx.lineTo(px + w*0.045, py+ph+h*0.23);
+      ctx.stroke();
+      return finish(canvas);
+    }
+
+
+    // ---------- QR code page ----------
+    if(content.type === 'qr'){
+      // eyebrow label
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      ctx.fillText(content.eyebrow || 'SCAN', pad, h*0.095);
+
+      // title
+      ctx.fillStyle = ink;
+      var tSz = Math.round(w * 0.058);
+      ctx.font = '400 ' + tSz + 'px "Fraunces", serif';
+      ctx.fillText(content.title || 'Scan to listen.', pad, h*0.195);
+
+      // sub text
+      ctx.fillStyle = inkSoft;
+      ctx.font = '400 ' + Math.round(w*0.026) + 'px "Space Grotesk", sans-serif';
+      ctx.fillText(content.sub || 'Open your camera and point it here.', pad, h*0.26);
+
+      // decorative hairline
+      ctx.strokeStyle = 'rgba(26,26,24,0.18)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pad, h*0.3); ctx.lineTo(w - pad, h*0.3); ctx.stroke();
+
+      // QR code placeholder box (will be replaced by loadQRPageExact once image loads)
+      var qx = w*0.5 - w*0.26, qy = h*0.34, qs = w*0.52;
+      ctx.fillStyle = '#F9F7F2';
+      ctx.fillRect(qx, qy, qs, qs);
+      ctx.strokeStyle = 'rgba(26,26,24,0.25)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(qx, qy, qs, qs);
+
+      // corner marks
+      var cm = qs * 0.12;
+      [[qx, qy],[qx+qs-cm, qy],[qx, qy+qs-cm],[qx+qs-cm, qy+qs-cm]].forEach(function(c){
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(c[0], c[1]+cm); ctx.lineTo(c[0], c[1]); ctx.lineTo(c[0]+cm, c[1]);
+        ctx.moveTo(c[0], c[1]+qs*0*(1-(c[0]===qx?0:1))); // skip
+        ctx.stroke();
+      });
+
+      // "SCAN" label below box
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      var slabel = '— SCROLL BUTTON BELOW TO SCAN —';
+      var sw = ctx.measureText(slabel).width;
+      ctx.fillText(slabel, w*0.5 - sw*0.5, qy + qs + h*0.055);
+
+      return finish(canvas);
+    }
+
+    // ---------- plain text page ----------
+    var y = h * 0.15;
+
+    if(content.eyebrow){
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.024) + 'px "IBM Plex Mono", monospace';
+      ctx.fillText(content.eyebrow, pad, y);
+      y += h * 0.05;
+    }
+
+    if(content.title){
+      ctx.fillStyle = ink;
+      var tSize = Math.round(w * 0.058);
+      ctx.font = '400 ' + tSize + 'px "Fraunces", serif';
+      y += tSize * 0.86;
+      y = wrapText(ctx, content.title, pad, y, w - pad*2, tSize * 1.12);
+      y += h * 0.02;
+    }
+
+    if(content.body){
+      ctx.fillStyle = inkSoft;
+      var bodySize = Math.round(w * 0.028);
+      ctx.font = '400 ' + bodySize + 'px "Space Grotesk", sans-serif';
+      content.body.forEach(function(p){
+        y = wrapText(ctx, p, pad, y, w - pad*2.4, bodySize * 1.65);
+        y += h * 0.025;
+      });
+    }
+
+    if(content.tag){
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      ctx.fillText(content.tag, pad, h * 0.9);
+    }
+
+    return finish(canvas);
+
+    function finish(canvas){
+      paintPageVignette(ctx, w, h, spineSide || 'left');
+      drawGutterShadow(ctx, w, h, spineSide || 'left');
+      var tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return tex;
+    }
+  }
+
+  // ---------- three.js setup ----------
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xF8F7F6);
+
+  var camera = new THREE.PerspectiveCamera(32, window.innerWidth/window.innerHeight, 0.1, 100);
+
+  // On a HiDPI/Retina screen the canvas is already supersampled by the
+  // pixel ratio below, which anti-aliases edges on its own -- turning on
+  // MSAA *as well* roughly quadruples the fragment work for no visible
+  // benefit and is a common source of scroll/animation jank on laptops.
+  var pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  var renderer = new THREE.WebGLRenderer({
+    antialias: pixelRatio < 1.5,
+    powerPreference: 'high-performance',
+    alpha: false
+  });
+  renderer.shadowMap.enabled = false;
+  renderer.setPixelRatio(pixelRatio);
+  stageEl.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.74);
+  keyLight.position.set(-1.3, 4.4, 2.1);
+  scene.add(keyLight);
+  scene.add(keyLight.target);
+  var fillLight = new THREE.DirectionalLight(0xdfe6f2, 0.2);
+  fillLight.position.set(-2.6, 0.8, 2.4);
+  scene.add(fillLight);
+  var bounceLight = new THREE.DirectionalLight(0xffffff, 0.13);
+  bounceLight.position.set(1.6, -1.2, 2.6);
+  scene.add(bounceLight);
+
+  // ---------- faux product-photo drop shadow, driven by ONE light ----------
+  // The book is a thin plane standing upright facing the camera, so letting
+  // Three.js actually cast a shadow from a directional light onto a floor
+  // produces a thin sliver, not a believable flat-lay shadow -- that was
+  // tried and rejected earlier. Instead we paint one soft contact-shadow
+  // shape and drive its transform every frame directly from the real page
+  // geometry: how wide the open spread currently is, where its center
+  // currently sits, and how high the actively-turning leaf is currently
+  // lifted. There is no cross-fading between separate pre-rendered shadow
+  // images anywhere below -- one shape, continuously reshaped by the same
+  // numbers that move the pages.
+  //
+  // Single defined light source, used to pick the one fixed direction every
+  // shadow in this scene falls toward:
+  var SHADOW_LIGHT_DIR = (function(){
+    var v = new THREE.Vector2(-keyLight.position.x, -keyLight.position.y);
+    return v.normalize(); // light sits up + slightly left of the book, so shadows fall down + slightly right
+  })();
+
+  function makeShadowTexture(){
+    var pad = 220;
+    var bw = 640, bh = Math.round(bw * (PAGE_H / PAGE_W));
+    var w = bw + pad * 2, h = bh + pad * 2;
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+
+    // wide, very soft ambient falloff
+    ctx.save();
+    ctx.filter = 'blur(54px)';
+    ctx.fillStyle = 'rgba(32,30,26,0.24)';
+    ctx.fillRect(pad + 10, pad + 22, bw - 8, bh - 4);
+    ctx.restore();
+
+    // tighter mid shadow, mostly under + right of the book
+    ctx.save();
+    ctx.filter = 'blur(26px)';
+    ctx.fillStyle = 'rgba(24,22,18,0.34)';
+    ctx.fillRect(pad + 14, pad + 18, bw - 10, bh - 6);
+    ctx.restore();
+
+    // crisp dark contact line right at the bottom + right edges
+    ctx.save();
+    ctx.filter = 'blur(9px)';
+    ctx.fillStyle = 'rgba(18,16,13,0.5)';
+    ctx.fillRect(pad + 16, pad + bh - 10, bw - 20, 16);
+    ctx.fillRect(pad + bw - 12, pad + 16, 16, bh - 20);
+    ctx.restore();
+
+    return { canvas:canvas, w:w, h:h, bw:bw, bh:bh, pad:pad };
+  }
+
+  var shadowTexData = makeShadowTexture();
+  var shadowTex = new THREE.CanvasTexture(shadowTexData.canvas);
+  shadowTex.needsUpdate = true;
+  // Base size is calibrated for a single PAGE_W-wide closed cover. At
+  // render time we scale.x this by (currentBookWidth / PAGE_W) so the same
+  // shape stretches to match the real open width instead of switching to a
+  // different image.
+  var shadowWorldW = PAGE_W * (shadowTexData.w / shadowTexData.bw);
+  var shadowWorldH = PAGE_H * (shadowTexData.h / shadowTexData.bh);
+  var shadowGeo = new THREE.PlaneGeometry(shadowWorldW, shadowWorldH);
+  var shadowMat = new THREE.MeshBasicMaterial({ map:shadowTex, transparent:true, depthWrite:false, toneMapped:false });
+  var dropShadow = new THREE.Mesh(shadowGeo, shadowMat);
+  dropShadow.renderOrder = -1;
+
+  // Lift shadow: the patch of extra shadow a page casts on the surface
+  // below it while it's raised mid-turn. Its horizontal position tracks the
+  // real, currently-rotating leaf (halfway between the spine and that
+  // leaf's actual current far-edge position -- read directly from its
+  // rotation, not tuned), offset toward SHADOW_LIGHT_DIR the way a raised
+  // object's shadow shifts away from the light. Its strength uses the exact
+  // same sin(c*PI) arc value that drives that leaf's own physical bend/lift
+  // in updateBend() below -- so it isn't an independent opacity animation,
+  // it's reading the same lift the geometry is already doing.
+  function makeLiftShadowTexture(){
+    var w = 1200, h = 840;
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    var cx = w * 0.5, cy = h * 0.56;
+    var grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, w * 0.5);
+    grad.addColorStop(0,    'rgba(18,17,14,0.30)');
+    grad.addColorStop(0.4,  'rgba(18,17,14,0.15)');
+    grad.addColorStop(0.75, 'rgba(18,17,14,0.05)');
+    grad.addColorStop(1,    'rgba(18,17,14,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    return canvas;
+  }
+
+  var liftShadowTex = new THREE.CanvasTexture(makeLiftShadowTexture());
+  liftShadowTex.needsUpdate = true;
+  var liftShadowGeo = new THREE.PlaneGeometry(PAGE_W * 1.2, PAGE_H * 0.9);
+  var liftShadowMat = new THREE.MeshBasicMaterial({ map:liftShadowTex, transparent:true, depthWrite:false, toneMapped:false, opacity:0.55 });
+  var liftShadow = new THREE.Mesh(liftShadowGeo, liftShadowMat);
+  liftShadow.renderOrder = 1;
+
+  // Breeze contact shadow: the same soft radial blob as the turn-lift
+  // shadow above, reused for whichever page(s) are currently fluttering in
+  // the wind -- its own mesh/material per side so it never fights with the
+  // turn-lift shadow (a real page turn and a gust can't happen at once,
+  // since scrolling itself resets the idle clock, but each stays fully
+  // independent regardless). One for each side of the spine, since a gust
+  // can flutter the exposed right page and the exposed left page together.
+  var breezeShadowMatR = liftShadowMat.clone();
+  breezeShadowMatR.opacity = 0;
+  var breezeShadowR = new THREE.Mesh(liftShadowGeo, breezeShadowMatR);
+  breezeShadowR.renderOrder = 1;
+  var breezeShadowMatL = liftShadowMat.clone();
+  breezeShadowMatL.opacity = 0;
+  var breezeShadowL = new THREE.Mesh(liftShadowGeo, breezeShadowMatL);
+  breezeShadowL.renderOrder = 1;
+
+  var bookGroup = new THREE.Group();
+  scene.add(bookGroup);
+  dropShadow.position.set(PAGE_W/2, -0.05, -0.06);
+  bookGroup.add(dropShadow);
+  liftShadow.position.set(0, 0, 0.012);
+  liftShadow.scale.set(0.001, 0.001, 1);
+  bookGroup.add(liftShadow);
+  breezeShadowR.position.set(0, 0, 0.011);
+  breezeShadowR.scale.set(0.001, 0.001, 1);
+  bookGroup.add(breezeShadowR);
+  breezeShadowL.position.set(0, 0, 0.011);
+  breezeShadowL.scale.set(0.001, 0.001, 1);
+  bookGroup.add(breezeShadowL);
+
+  var COVER_THICKNESS = 0.015;
+  var COVER_EDGE_COLOR = 0x8B8570;
+
+  function buildLeaf(pageIdx){
+    var geo = new THREE.PlaneGeometry(PAGE_W, PAGE_H, SEG_X, 1);
+    geo.translate(PAGE_W/2, 0, 0);
+    var basePos = geo.attributes.position.array.slice();
+
+    var frontTex = makeTexture(PAGES[pageIdx].front, 'left');
+    var backTex = makeTexture(PAGES[pageIdx].back, 'right');
+    // Flip the back face horizontally via a UV transform (repeat.x=-1,
+    // offset.x=1 maps u -> 1-u) rather than duplicating geometry with its
+    // own mirrored UVs -- front and back share one geometry buffer. This
+    // flip lands entirely inside 0..1, so it never actually needs
+    // RepeatWrapping for the mapping itself; that was left on regardless,
+    // and it has a real side effect: right at the u=0/u=1 seam, the GPU's
+    // texture filtering footprint samples a little past the edge, and
+    // RepeatWrapping answers that by wrapping around to the texture's
+    // OPPOSITE edge -- so a sliver of whatever's drawn on the far edge of
+    // the image (often a hard line/border) bleeds in along the near edge.
+    // That's the stray line the "hello" page (page 2) showed while
+    // flipping. ClampToEdgeWrapping (three.js's own default) instead just
+    // repeats the nearest edge texel for that sliver -- no seam, no bleed.
+    backTex.wrapS = THREE.ClampToEdgeWrapping;
+    backTex.repeat.x = -1;
+    backTex.offset.x = 1;
+
+    var frontMat = new THREE.MeshStandardMaterial({ map:frontTex, color:0xf0f0f0, roughness:0.85, metalness:0.02, side:THREE.FrontSide, polygonOffset:true, polygonOffsetFactor:0, polygonOffsetUnits:0 });
+    var backMat  = new THREE.MeshStandardMaterial({ map:backTex,  color:0xf0f0f0, roughness:0.85, metalness:0.02, side:THREE.BackSide, polygonOffset:true, polygonOffsetFactor:0, polygonOffsetUnits:0 });
+
+    var frontMesh = new THREE.Mesh(geo, frontMat);
+    var backMesh  = new THREE.Mesh(geo, backMat);
+    frontMesh.castShadow = true;
+    frontMesh.receiveShadow = true;
+    backMesh.castShadow = true;
+    backMesh.receiveShadow = true;
+
+    var group = new THREE.Group();
+    group.add(frontMesh, backMesh);
+    group.userData.geo = geo;
+    group.userData.basePos = basePos;
+    group.userData.isCover = false;
+    return group;
+  }
+
+  function buildCover(pageIdx){
+    var geo = new THREE.BoxGeometry(PAGE_W, PAGE_H, COVER_THICKNESS, SEG_X, 1, 1);
+    geo.translate(PAGE_W/2, 0, 0);
+
+    var frontTex = makeTexture(PAGES[pageIdx].front, 'left');
+    var backTex = makeTexture(PAGES[pageIdx].back, 'right');
+
+    var edgeMat = new THREE.MeshStandardMaterial({ color:COVER_EDGE_COLOR, roughness:0.95, metalness:0.0 });
+    var spineEdgeMat = new THREE.MeshBasicMaterial({ transparent:true, opacity:0, depthWrite:false });
+    var frontMat = new THREE.MeshStandardMaterial({ map:frontTex, color:0xdfdfdf, roughness:0.75, metalness:0.02, polygonOffset:true, polygonOffsetFactor:0, polygonOffsetUnits:0 });
+    var backMat  = new THREE.MeshStandardMaterial({ map:backTex,  color:0xdfdfdf, roughness:0.75, metalness:0.02, polygonOffset:true, polygonOffsetFactor:0, polygonOffsetUnits:0 });
+
+    // BoxGeometry face material order: +x(fore-edge), -x(spine side), +y, -y, +z(front), -z(back)
+    // The spine-side edge sits inside the binding in a real book and is never
+    // actually visible — rendering it as a solid panel is what read as a
+    // separate flap "lifting" at the gutter, unlike the flexible paper
+    // leaves which have no such face at all. Hide it to match their feel.
+    var mats = [edgeMat, spineEdgeMat, edgeMat, edgeMat, frontMat, backMat];
+    var mesh = new THREE.Mesh(geo, mats);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    var group = new THREE.Group();
+    group.add(mesh);
+    group.userData.isCover = true;
+    return group;
+  }
+
+  var leaves = [];
+  // Depth step between one leaf and the next in stacking order. This is a
+  // real world-space offset, so it is NOT free: the scene uses a
+  // perspective camera, and a leaf pushed toward the viewer is also drawn
+  // very slightly LARGER. Across a stack this many leaves deep, a coarse
+  // step accumulates into a visible size mismatch exactly where it is least
+  // forgivable -- at the binding, where the left page's edge and the right
+  // page's edge are supposed to meet as one continuous line. At the old
+  // 0.03 the two pages of a spread sat a full step apart (and up to two
+  // steps mid-turn), enough to misalign their edges by several pixels and
+  // read as a small break right at the centre of the book. It also meant
+  // that each time one page finished turning and the stack boundary moved
+  // on, every settled leaf's depth shifted by that same full step at once
+  // -- a simultaneous, if small, pop.
+  //
+  // Shrinking it to 0.006 drops both effects to well under a pixel while
+  // still giving the depth test a clean, unambiguous ordering to work with
+  // -- reinforced by the per-rank polygon offset in setPolygonOffset, which
+  // biases the depth comparison itself without moving any geometry at all
+  // and so costs nothing in perspective terms. See the cover compensation
+  // in render() for the one case a step this small could not survive on
+  // its own.
+  var Z_GAP = 0.006;
+  var Z_BOOST = 0.12;
+
+  for(var i = 0; i < L; i++){
+    var isCoverLeaf = (i === 0 || i === L - 1);
+    var g = isCoverLeaf ? buildCover(i) : buildLeaf(i);
+    bookGroup.add(g);
+    leaves.push(g);
+  }
+
+  function setPolygonOffset(group, factor){
+    if(group.userData.isCover){
+      var mats = group.children[0].material;
+      [4, 5].forEach(function(idx){
+        mats[idx].polygonOffsetFactor = factor;
+        mats[idx].polygonOffsetUnits = factor;
+      });
+    } else {
+      group.children.forEach(function(mesh){
+        mesh.material.polygonOffsetFactor = factor;
+        mesh.material.polygonOffsetUnits = factor;
+      });
+    }
+  }
+
+  // ---------- exact front cover image ----------
+
+  // ---------- IMAGE & QR CONFIGURATION ----------
+  // QR_LEAF_INDEX: which leaf (0-based) gets the QR page
+  // QR_SIDE: 'front' or 'back' of that leaf
+  var QR_LEAF_INDEX = 16;  // page 30 = leaf 16 back (shifted +1 after new leaf 3)
+  var QR_SIDE = 'back';
+
+  var IMAGE_MAP = {
+    '0-front':  'assets/images/front-coverpage-top.png',
+    '0-back':   'assets/images/front-coverpage-bottom.png',
+    '1-front':  'assets/images/page-01.png',
+    '1-back':   'assets/images/page-02.png',
+    '2-front':  'assets/images/page-03.png',
+    '2-back':   'assets/images/page-04.png',
+    '3-front':  'assets/images/page-3a.png',   // ← NEW leaf
+    '3-back':   'assets/images/page-3b.png',   // ← NEW leaf
+    '4-front':  'assets/images/page-05.png',
+    '4-back':   'assets/images/page-06.png',
+    '5-front':  'assets/images/page-07.png',
+    '5-back':   'assets/images/page-08.png',
+    '6-front':  'assets/images/page-09.png',
+    '6-back':   'assets/images/page-10.png',
+    '7-front':  'assets/images/page-11.png',
+    '7-back':   'assets/images/page-12.png',
+    '8-front':  'assets/images/page-13.png',
+    '8-back':   'assets/images/page-14.png',
+    '9-front':  'assets/images/page-15.png',
+    '9-back':   'assets/images/page-16.png',
+    '10-front': 'assets/images/page-17.png',
+    '10-back':  'assets/images/page-18.png',
+    '11-front': 'assets/images/page-19.png',
+    '11-back':  'assets/images/page-20.png',
+    '12-front': 'assets/images/page-21.png',
+    '12-back':  'assets/images/page-22.png',
+    '13-front': 'assets/images/page-23.png',
+    '13-back':  'assets/images/page-24.png',
+    '14-front': 'assets/images/page-25.png',
+    '14-back':  'assets/images/page-26.png',
+    '15-front': 'assets/images/page-27.png',
+    '15-back':  'assets/images/page-28.png',
+    '16-front': 'assets/images/page-29.png',
+    '16-back':  'assets/images/page-30.png',
+    '17-front': 'assets/images/page-31.png',
+    '17-back':  'assets/images/page-32.png',
+    '18-front': 'assets/images/back-coverpage-top.png',
+    '18-back':  'assets/images/back-coverpage-bottom.png'
+  };
+
+  var QR_CODE_IMAGE = 'assets/images/qrcode.png';
+
+
+  function textureFromImageExact(img){
+    var w = 2048, h = Math.round(2048 * (PAGE_H / PAGE_W));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    drawImageCover(ctx, img, w, h);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    // Without this a page viewed at an angle (which is most of them, mid
+    // page-turn or receding into the stack) samples the texture with no
+    // anisotropic filtering at all (default is 1x) and reads noticeably
+    // softer than the same page viewed flat-on.
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return tex;
+  }
+
+
+  // ---------- UNIFIED IMAGE LOADER ----------
+  function loadAllPageImages(){
+    var keys = Object.keys(IMAGE_MAP);
+    var total = keys.length;
+    var loaded = 0;
+    var failed = 0;
+    function onDone(success, src){
+      if(success) loaded++; else { failed++; console.warn('[Portfolio] Image failed to load:', src); }
+      if(loaded + failed === total && failed > 0){
+        console.error('[Portfolio] ' + failed + '/' + total + ' images failed. Check that your assets/images/ folder is committed to GitHub.');
+      }
+    }
+    for(var k = 0; k < keys.length; k++){
+      (function(key){
+        var parts = key.split('-');
+        var leafIdx = parseInt(parts[0]);
+        var side = parts[1];
+        if(leafIdx === QR_LEAF_INDEX && side === QR_SIDE){ total--; return; }
+        var img = new Image();
+        img.onload = function(){
+          applyTextureToFace(leafIdx, side, textureFromImageExact(img));
+          onDone(true, img.src);
+        };
+        img.onerror = function(){ onDone(false, IMAGE_MAP[key]); };
+        img.src = IMAGE_MAP[key];
+      })(keys[k]);
+    }
+    loadQRPageExact();
+  }
+
+  function loadQRPageExact(){
+    var img = new Image();
+    img.onerror = function(){ console.warn('[Portfolio] QR image failed to load:', QR_CODE_IMAGE); };
+    img.onload = function(){
+      var w = 2048, h = Math.round(2048 * (PAGE_H / PAGE_W));
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      var ink = '#1A1A18', inkSoft = '#5B5B57', pad = w * 0.09;
+
+      ctx.fillStyle = '#F1EEE5';
+      ctx.fillRect(0, 0, w, h);
+      paintPaperGrain(ctx, w, h);
+
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      ctx.fillText('LISTEN', pad, h*0.095);
+
+      ctx.fillStyle = ink;
+      ctx.font = '400 ' + Math.round(w*0.058) + 'px "Fraunces", serif';
+      ctx.fillText('Scan to hear the story.', pad, h*0.195);
+
+      ctx.fillStyle = inkSoft;
+      ctx.font = '400 ' + Math.round(w*0.026) + 'px "Space Grotesk", sans-serif';
+      ctx.fillText('Open your camera and point it here.', pad, h*0.26);
+
+      ctx.strokeStyle = 'rgba(26,26,24,0.18)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pad, h*0.3); ctx.lineTo(w - pad, h*0.3); ctx.stroke();
+
+      var qs = w * 0.52, qx = w * 0.5 - qs * 0.5, qy = h * 0.34;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(qx - 20, qy - 20, qs + 40, qs + 40);
+      ctx.drawImage(img, qx, qy, qs, qs);
+
+      ctx.fillStyle = inkSoft;
+      ctx.font = '500 ' + Math.round(w*0.021) + 'px "IBM Plex Mono", monospace';
+      var lbl = '\u2014 OR CLICK THE SCAN BUTTON BELOW \u2014';
+      var lw = ctx.measureText(lbl).width;
+      ctx.fillText(lbl, w * 0.5 - lw * 0.5, qy + qs + 60 + h*0.04);
+
+      var gutterDir = QR_SIDE === 'front' ? 'left' : 'right';
+      paintPageVignette(ctx, w, h, gutterDir);
+      drawGutterShadow(ctx, w, h, gutterDir);
+
+      var tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      applyTextureToFace(QR_LEAF_INDEX, QR_SIDE, tex);
+    };
+    img.src = QR_CODE_IMAGE;
+  }
+
+
+  var state = leaves.map(function(){ return { target:0, current:0, prev:0, dir:1 }; });
+
+
+  // Shared by updateBend (per-vertex) and the breeze contact shadow (a
+  // single representative sample near the free edge) so the two never
+  // drift out of sync with each other. Deliberately clamped to 0..1 -- a
+  // page in the wind may lift toward the camera, but it must never be
+  // modeled as dipping the other way, back into the stack of pages bound
+  // directly behind it. That backward slack is what let a buried page's
+  // content show through the one on top: the fluttering leaf would
+  // occasionally sink past the very next leaf in the closed stack, which
+  // sits only one thin Z_GAP behind it.
+  function breezeLift01(t, time, seed){
+    var wave = Math.sin(t * 3.0 - time * 2.0 + seed);
+    return (wave + 1) * 0.5; // 0..1, never negative
+  }
+
+  // A single representative sample near the free edge (t=0.92), used to
+  // drive the breeze contact shadow below -- reads the exact same wave as
+  // updateBend so the shadow never drifts out of sync with the geometry
+  // it's supposedly cast by.
+  function breezeEdgeFlutter(leafIndex, time){
+    if(leafIndex < 0) return 0;
+    var seed = leafIndex * 1.9 + 0.7;
+    var t = 0.92;
+    return breezeLift01(t, time, seed) * Math.pow(t, 1.7);
+  }
+
+  // Soft contact shadow under whichever page is currently exposed and
+  // lifting in the wind -- same mental model as the turn-lift shadow further
+  // down: a raised edge throws a shadow that grows with how high it's
+  // lifted, offset along the one fixed light direction everything else in
+  // this scene already shadows toward. Pinned just behind that leaf's own
+  // group Z (leafZ) rather than a fixed depth, so it reliably draws behind
+  // the curling page itself -- reading as shadow the lifted edge throws onto
+  // the page underneath it, not a mark floating on top of the curl.
+  function updateBreezeShadow(mesh, mat, leafIndex, leafZ, time, strength){
+    if(leafIndex < 0 || strength < 0.001){
+      mat.opacity = 0;
+      return;
+    }
+    var c = state[leafIndex].current;
+    var farX = PAGE_W * Math.cos(Math.PI * c);
+    var flutter = breezeEdgeFlutter(leafIndex, time) * strength;
+    // Small and snug against the outer edge itself, not a big blob
+    // floating mid-page -- this is a contact shadow at the fold, not a
+    // general-purpose lift shadow. Biased toward the bottom of the page:
+    // the lift is actually uniform top-to-bottom, but from this camera
+    // angle only the lower portion of the curl reveals anything behind it
+    // (the table) -- higher up, the curl just occludes more of the same
+    // page, so that's where a viewer's eye actually reads "lifted."
+    mesh.position.x = farX * 0.92 + SHADOW_LIGHT_DIR.x * flutter * 0.16;
+    mesh.position.y = -PAGE_H * 0.3 + SHADOW_LIGHT_DIR.y * flutter * 0.16;
+    // Just behind its own leaf, expressed as a fraction of the stacking
+    // step rather than a fixed distance -- a fixed one would land exactly
+    // on the next leaf back now that the step itself is fine-grained.
+    mesh.position.z = leafZ - Z_GAP * 0.4;
+    mesh.scale.set(0.34, 0.4, 1);
+    mat.opacity = 0.7 * flutter;
+  }
+
+  function updateBend(group, local, dir, breezeStrength, breezeTime, seed){
+    var geo = group.userData.geo;
+    var base = group.userData.basePos;
+    var arc = reduceMotion ? 0 : Math.sin(local * Math.PI);
+    var pos = geo.attributes.position.array;
+    var hasBreeze = breezeStrength > 0.0005;
+    for(var v = 0; v < pos.length; v += 3){
+      var t = base[v] / PAGE_W;
+      var hump = Math.sin(t * Math.PI * 0.85);
+      var curlBack = Math.pow(t, 3);
+      // Realistic page curl: the curve goes to the OPPOSITE side depending
+      // on direction.  Forward (opening, dir=1) the body bulges TOWARD the
+      // camera; backward (closing, dir=-1) it bows AWAY.
+      //
+      // The earlier `sCurve * dir` attempt flipped EVERYTHING, including the
+      // free-edge curlBack term -- which made the tip swing to the opposite
+      // sign from the body, creating a harsh S that crossed itself in screen
+      // space and briefly exposed the far-side texture ("content overtaking"
+      // glitch, page 2 backward only).
+      //
+      // Fix: the backward curve is a true opposite-side mirror of the body,
+      // but the curlBack weight is REDUCED so the tip STAYS on the same side
+      // as the body (never crosses zero).  Visually: the page bows to the
+      // other side, and the tip just flattens out rather than whipping past
+      // center -- a clean, natural settling motion with no self-crossing.
+      var sCurve;
+      if(dir < 0){
+        sCurve = -(1.1 * hump - 0.3 * curlBack);
+      } else {
+        sCurve = (1.3 * hump) - (0.9 * curlBack);
+      }
+      var lift = t * arc * (Z_BOOST * 0.4);
+
+      // ---- breeze flutter: deliberately independent of `arc` above, which
+      // is exactly 0 whenever a page is at rest (flat right or flat left)
+      // -- that's precisely the moment the wind should be visible, since a
+      // page mid-flip is already being driven by the reader's own scroll. ----
+      //
+      // Only ever called (see render()) for the one or two pages currently
+      // exposed at the front of each stack -- a buried page underneath is
+      // physically shielded and can't move, and by never bending it there's
+      // nothing left that could poke through the page actually on top.
+      //
+      // A SINGLE traveling wave, no per-vertex-row phase split: this
+      // geometry only has two rows (top/bottom edge, no vertical
+      // subdivision), so an earlier version that phase-shifted the wave by
+      // vertical position sheared the top and bottom of every column out of
+      // sync with each other -- on a mesh carrying readable text that read
+      // as the page tearing rather than fluttering. One coherent wave keeps
+      // every vertical edge moving together, and breezeLift01 keeps it
+      // strictly non-negative (lift toward camera only -- see that function).
+      var breezeX = 0, breezeZ = 0;
+      if(hasBreeze){
+        // Anchored at the spine (t=0), free at the outer edge (t=1) -- same
+        // cantilevered-flag shape as a real sheet of paper pinned on one
+        // side: the binding can't move, the loose edge does almost all of it.
+        var edgeWeight = Math.pow(t, 1.7);
+        var flutter = breezeLift01(t, breezeTime, seed) * edgeWeight * breezeStrength;
+        // The group itself is rotated -PI*local around Y (see g.rotation.y
+        // below/in render()), which is what actually turns the page. On the
+        // left-hand (already-turned) stack that rotation is ~180 degrees,
+        // which flips the sign of local Z once transformed to world space --
+        // a positive breezeZ there would push the page AWAY from the camera,
+        // backward into the very stack it's supposed to be lifting clear of.
+        // This sign flip keeps "lift toward camera" true in WORLD space on
+        // both sides, not just the untouched (local==world) right side --
+        // without it, the exposed page could sink behind its own hidden
+        // neighbor and let that page's content show through instead.
+        var towardCamera = Math.cos(Math.PI * local) >= 0 ? 1 : -1;
+        breezeZ = BREEZE_LIFT * flutter * towardCamera;
+        // Gentle, smooth inward pull as the edge lifts -- flutter*flutter
+        // has no cusp, so the curl never snaps.
+        breezeX = -BREEZE_CURL * PAGE_W * flutter * flutter;
+      }
+
+      pos[v]   = base[v] * (1 - 0.1 * arc) + breezeX;
+      pos[v+1] = base[v+1];
+      pos[v+2] = base[v+2] + BEND_AMP * arc * sCurve + lift + breezeZ;
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+  }
+
+  function spreadFactor(){
+    var o = (typeof state !== 'undefined' && state[0]) ? state[0].current : 0;
+    var c = (typeof state !== 'undefined' && state[L-1]) ? state[L-1].current : 0;
+    return o * (1 - c);
+  }
+
+  function cameraDistanceFor(openLocal){
+    var aspect = window.innerWidth / window.innerHeight;
+    var vFOV = camera.fov * Math.PI / 180;
+    var SIZE_MARGIN = 1.45;
+    var halfWClosed = (PAGE_W/2) * 1.08 * SIZE_MARGIN;
+    var halfWOpen = PAGE_W * 1.1 * SIZE_MARGIN;
+    var halfW = halfWClosed + (halfWOpen - halfWClosed) * openLocal;
+    var halfH = (PAGE_H/2) * 1.06 * SIZE_MARGIN;
+    var distH = halfH / Math.tan(vFOV/2);
+    var distW = halfW / (Math.tan(vFOV/2) * aspect);
+    return Math.max(distH, distW, 2.0);
+  }
+
+  function fitCamera(){
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.position.set(0, 0, cameraDistanceFor(spreadFactor()));
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+  }
+
+  function onResize(){
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    fitCamera();
+    layoutSpacer();
+  }
+  window.addEventListener('resize', onResize);
+
+  function lerp(a,b,t){ return a + (b-a)*t; }
+
+  function computeTargets(){
+    var vh = window.innerHeight;
+    var maxScroll = spacerHeight - vh;
+    var y = window.scrollY;
+    var progress = maxScroll > 0 ? Math.min(Math.max(y/maxScroll, 0), 1) : 0;
+    var scaled = progress * TOTAL_UNITS;
+
+    hintEl.style.opacity = progress > 0.03 ? '0' : '1';
+
+    leaves.forEach(function(g, i){
+      var local = scaled - (PAUSE + i);
+      state[i].target = Math.min(Math.max(local, 0), 1);
+    });
+  }
+
+  function render(){
+    computeTargets();
+
+    // ---- wind breeze scheduling: only ever runs while genuinely idle ----
+    var breezeNow = performance.now();
+    var idleSeconds = (breezeNow - lastActivityTime) / 1000;
+    if(reduceMotion){
+      breeze.active = false;
+      breeze.strength = 0;
+    } else {
+      if(!breeze.active){
+        if(idleSeconds > BREEZE_IDLE_SECONDS && breezeNow > breeze.cooldownUntil){
+          breeze.active = true;
+          breeze.startTime = breezeNow;
+          breeze.duration = 3.6 + Math.random() * 2.4; // one gust, ~3.6-6s
+        }
+      } else {
+        var interrupted = idleSeconds < 0.15; // a fresh interaction just fired
+        var elapsed = (breezeNow - breeze.startTime) / 1000;
+        if(interrupted || elapsed > breeze.duration){
+          breeze.active = false;
+          // Interrupted gusts get a short cooldown (don't re-trigger the
+          // instant a click/scroll ends); naturally finished ones get a
+          // longer, randomized pause so gusts feel occasional, not on a timer.
+          breeze.cooldownUntil = breezeNow + (interrupted ? 1500 : 5000 + Math.random() * 6000);
+        }
+      }
+      var targetStrength = 0;
+      if(breeze.active){
+        var e = (breezeNow - breeze.startTime) / 1000;
+        var fadeIn = Math.min(1, e / 0.9);
+        var fadeOut = Math.min(1, (breeze.duration - e) / 1.2);
+        targetStrength = Math.max(0, Math.min(fadeIn, fadeOut));
+      }
+      breeze.strength = lerp(breeze.strength, targetStrength, 0.08);
+    }
+    var breezeTime = breezeNow / 1000;
+
+    var turnArc = 0, turnC = 0.5;
+    leaves.forEach(function(g, i){
+      var s = state[i];
+      var ease = reduceMotion ? 1 : (g.userData.isCover ? EASE_COVER : EASE);
+      s.current = lerp(s.current, s.target, ease);
+
+      var delta = s.current - s.prev;
+      if(Math.abs(delta) > 0.0004){
+        s.dir = delta > 0 ? 1 : -1;
+      }
+      s.prev = s.current;
+
+      var arc = Math.sin(s.current * Math.PI);
+      // Track whichever leaf is actively mid-turn right now (the one with
+      // the largest arc value) so the moving turn-shadow below can follow
+      // it -- at rest every leaf sits at c=0 or c=1 where arc is 0, so this
+      // stays inert except during an actual flip.
+      if(arc > turnArc){
+        turnArc = arc;
+        turnC = s.current;
+      }
+    });
+
+    // ---- which leaf is the live boundary between the two stacks ----
+    // Recomputed from scratch every single frame, straight off this frame's
+    // own scroll-derived target values -- no direction flag, no "last known
+    // live leaf", nothing carried over from the previous frame at all.
+    // Being stateless means there is nothing here that can ever get left
+    // behind and stuck: a leaf can't lose a status it was never granted and
+    // is never taking away later, it's just re-derived fresh each frame.
+    //
+    // This keys off `target`, not `current`. An earlier version checked
+    // `current < 0.999` instead, and that reads fine once a leaf is
+    // genuinely mid-swing, but it lags right at the START of a turn:
+    // `current` is the EASED value, so the instant a gentle scroll nudges a
+    // settled leaf's target a hair off 1, current -- still chasing it from
+    // 0.9999+ -- can sit above the 0.999 cutoff for several frames even
+    // though the leaf's rotation is already visibly moving (rotation reads
+    // `current` too, but even a tiny gap times PI is a visible tilt). This
+    // scan wouldn't notice yet, so it kept pointing at the OLD boundary --
+    // the leaf's own rank stayed frozen (still ranked as fully settled)
+    // while its rotation and bend were already animating out ahead of it,
+    // which is exactly what showed up as content sliding wrong on page 2
+    // and a curl that looked static rather than tracking the scroll while
+    // closing (the effect is most visible on a gentle scroll, since that's
+    // when the gap between target and current lingers longest). `target`
+    // has no such tail -- it's the raw scroll-derived value, exact and
+    // immediate -- so the boundary updates the same instant the scroll
+    // does, in lockstep with rotation and bend instead of a beat behind
+    // them.
+    var frontRight = -1;
+    for(var fi = 0; fi < L; fi++){
+      if(state[fi].target < 1){ frontRight = fi; break; }
+    }
+    var frontLeft = frontRight === -1 ? (L - 1) : (frontRight > 0 ? frontRight - 1 : -1);
+    // ---- SCAN button: fade in AFTER QR leaf passes 90° (page 30 visible), vanish BEFORE next leaf hits 90° ----
+    var scanOverlayEl = document.getElementById('scanOverlay');
+    if(scanOverlayEl && !_scanActive){
+      var t1 = Math.max(0, Math.min(1, state[QR_LEAF_INDEX].current)); // 0→1 as QR leaf flips
+      var t2 = Math.max(0, Math.min(1, state[QR_LEAF_INDEX+1].current)); // 0→1 as next leaf flips
+      // fadeIn  ramps 0→1 over the second half of QR leaf's flip (90°→180°, page 30 revealed)
+      var fadeIn  = Math.max(0, Math.min(1, (t1 - 0.5) / 0.5));
+      // fadeOut ramps 1→0 over the first half of next leaf's flip (0°→90°)
+      var fadeOut = Math.max(0, Math.min(1, 1 - t2 / 0.5));
+      var scanOpacity = Math.min(fadeIn, fadeOut);
+      scanOverlayEl.style.opacity = scanOpacity.toFixed(3);
+      scanOverlayEl.style.pointerEvents = scanOpacity > 0.15 ? 'auto' : 'none';
+    }
+
+
+    // RANK_BASE: rank is measured purely as DISTANCE from frontRight, one
+    // step per leaf either direction, full stop -- this bounds the whole
+    // book's rank spread (and so how far g.position.z ever has to travel
+    // for any single leaf's own flip) to exactly one Z_GAP, independent of
+    // book size or how deep a leaf sits in the stack. The earlier formula
+    // blended each leaf's rank between its right-stack and left-stack
+    // position (rank = (L-i)*(1-c) + (i+1)*c), which put the two endpoints
+    // (L-i and i+1) as far as L-1 apart for a leaf near either end of a
+    // long book -- e.g. the front cover's own single flip swung its
+    // g.position.z by up to (L-1)*Z_GAP, which under this scene's
+    // perspective camera reads as the page swelling larger and popping
+    // toward the viewer rather than turning in place: the "detached from
+    // the binding" look. Bounding every leaf's OWN swing to one Z_GAP,
+    // regardless of its index, removes that popping entirely -- the page
+    // stays pinned to the spine and only ever turns.
+    //
+    // Rank is measured as depth within a leaf's OWN stack, and the two
+    // stacks share a top. That last part is the whole point. Distance from
+    // the boundary (the obvious reading, and what this used to do) makes
+    // the leaf on either side of it one step apart -- but those two leaves
+    // are precisely the left and right pages of the spread the reader is
+    // looking at, and a step of separation between them is a real depth
+    // difference the perspective camera dutifully draws as a small size
+    // difference, so their edges no longer meet cleanly at the binding.
+    // Since the two of them lie on opposite sides of the spine and cannot
+    // overlap anywhere except along the hinge line itself, there is no
+    // reason for them to be separated at all: giving both stacks the same
+    // top rank puts the open spread on one exact plane, and its two halves
+    // line up perfectly.
+    //
+    // Each stack then recedes from that shared top independently, one step
+    // per leaf, which is genuinely what a book does -- pages pile up away
+    // from the middle on both sides.
+    //
+    // The live (frontRight) leaf rides from the shared top (RANK_BASE, its
+    // resting height as the top of the not-yet-turned stack) up to one step
+    // above it (RANK_BASE + 1) as it lands, since it comes to rest on top
+    // of the already-turned stack whose own top is at RANK_BASE. Once its
+    // target completes and the boundary moves on, it becomes that stack's
+    // top and every leaf shifts one step in the same direction at once --
+    // relative order untouched, and at this Z_GAP the absolute shift is far
+    // under a pixel.
+    var RANK_BASE = L;
+    var bendQueue = [];
+    leaves.forEach(function(g, i){
+      var s = state[i];
+      var c = s.current;
+      var rank;
+      if(frontRight === -1){
+        // Every leaf turned -- one stack, most recently turned on top.
+        rank = RANK_BASE - ((L - 1) - i);
+      } else if(i === frontRight){
+        rank = RANK_BASE + c;
+      } else if(i < frontRight){
+        // Already turned: the left-hand stack, topped by frontRight - 1.
+        rank = RANK_BASE - ((frontRight - 1) - i);
+      } else {
+        // Not yet turned: the right-hand stack under the live leaf.
+        rank = RANK_BASE - (i - frontRight);
+      }
+      setPolygonOffset(g, -rank);
+      // Real depth separation, not just a GL polygon-offset hint: once two
+      // leaves are both fully turned (c=1) they are LITERALLY coincident
+      // geometry -- same rotation, same flat plane, zero bend. The actual
+      // culprit turned out to be the covers: buildCover() gives leaf0/leaf8
+      // real BoxGeometry thickness (COVER_THICKNESS = 0.015), so a cover's
+      // own front/back face already sits +/-0.0075 off the group's local
+      // z=0 -- more than an order of magnitude bigger than the 0.001-per-
+      // rank nudge this used to apply. That nudge could never out-rank a
+      // cover's own geometry, so the cover kept winning the depth test and
+      // showing through over whichever inner leaf had settled beside it.
+      // The gap alone used to be made bigger than COVER_THICKNESS so that
+      // rank order always won over a cover's own face thickness. That works,
+      // but it forces the step to be coarse, which is what put a visible
+      // break at the binding (see the Z_GAP comment). Compensating for the
+      // thickness directly is both exact and free:
+      //
+      // A cover is a box straddling its group origin, so its two printed
+      // faces sit at local z = +/-COVER_THICKNESS/2. Whichever way it is
+      // rotated, the face actually turned toward the reader is the one that
+      // ends up at +COVER_THICKNESS/2 in world terms -- flat right, the +z
+      // front face is already facing us; flat left (rotated PI), the -z back
+      // face has swung around to face us, and its local -z maps to world +z.
+      // So a cover's visible surface always reads half a thickness nearer
+      // the camera than a paper leaf sitting at the same group z, which is
+      // precisely why a cover could out-draw a page that was supposed to be
+      // resting on top of it. Subtracting that half-thickness puts every
+      // leaf's VISIBLE surface -- cover or paper -- on the same evenly
+      // spaced ladder, so ordering stays correct no matter how fine the step
+      // gets. The cover's thickness then reads purely as thickness (its edge
+      // faces), which is what it is meant to be.
+      g.position.z = rank * Z_GAP - (g.userData.isCover ? COVER_THICKNESS / 2 : 0);
+
+      g.rotation.y = -Math.PI * c;
+      if(!g.userData.isCover){
+        bendQueue.push({ g: g, c: c, dir: s.dir, i: i });
+      }
+    });
+
+    // ---- which page(s) are actually exposed to open air ----
+    // Pages turn strictly in scroll order, so at any moment there are at
+    // most two a real breeze could ever reach: the next one due to turn
+    // (front of the untouched right-hand stack) and the one most recently
+    // turned (front of the already-read left-hand stack). Everything else
+    // is buried under a stack of other pages and physically can't move --
+    // applying the flutter to those was the actual source of the "next
+    // page's content leaking through" glitch: a buried leaf could lift
+    // enough in Z to poke in front of the page actually sitting on top of
+    // it. Only bending the exposed pair removes that possibility entirely.
+    // (frontRight/frontLeft themselves were already computed above, before
+    // the leaf loop, so the depth-ordering pass could use them too.)
+
+    // frontLeft is always settled flat (everything before frontRight has
+    // finished turning), but frontRight can be resting anywhere in [0,1] if
+    // the user simply stopped scrolling mid-turn -- a page frozen half-open
+    // at a steep angle to the camera. The local->world rotation mixes the
+    // curl (local X) and lift (local Z) perturbations together away from
+    // flat (their contribution to world Z both scale with sin/cos of the
+    // same angle), so applying full-strength breeze there reads as a
+    // distorted/glitchy page rather than a flutter. Only let breeze touch a
+    // leaf that is genuinely resting near flat on either side.
+    // Covers (index 0 / L-1) are rigid board, not paper -- bendQueue above
+    // already refuses to bend their geometry for exactly that reason. The
+    // breeze contact-shadow has to respect the same rule: a shadow implying
+    // a fluttering edge with no actual page movement behind it (a cover
+    // can't lift) is what read as a glitch on the contents spread, which
+    // lives on the back face of the rigid front-cover box.
+    var breezeGateR = 0, breezeGateL = 0;
+    if(frontRight >= 0 && !leaves[frontRight].userData.isCover){
+      var rc = state[frontRight].current;
+      if(rc < 0.06 || rc > 0.94) breezeGateR = breeze.strength;
+    }
+    if(frontLeft >= 0 && !leaves[frontLeft].userData.isCover){
+      var lc = state[frontLeft].current;
+      if(lc < 0.06 || lc > 0.94) breezeGateL = breeze.strength;
+    }
+    // Ease toward the gate instead of snapping straight to it -- see the
+    // breezeSmooth comment above the declaration for why.
+    breezeSmooth.R = lerp(breezeSmooth.R, breezeGateR, 0.12);
+    breezeSmooth.L = lerp(breezeSmooth.L, breezeGateL, 0.12);
+    if(breezeSmooth.R < 0.0008) breezeSmooth.R = 0;
+    if(breezeSmooth.L < 0.0008) breezeSmooth.L = 0;
+    var breezeStrengthR = breezeSmooth.R, breezeStrengthL = breezeSmooth.L;
+
+    bendQueue.forEach(function(item){
+      var strength = item.i === frontRight ? breezeStrengthR : (item.i === frontLeft ? breezeStrengthL : 0);
+      updateBend(item.g, item.c, item.dir, strength, breezeTime, item.i * 1.9 + 0.7);
+    });
+
+    var openLocal = state[0].current;
+    var closeLocal = state[L-1].current;
+    bookGroup.position.x = -(PAGE_W/2) * (1 - openLocal) + (PAGE_W/2) * closeLocal;
+    camera.position.z = cameraDistanceFor(openLocal * (1 - closeLocal));
+
+    // ---- ground contact shadow: reshaped every frame from the real
+    // rotation of whichever cover is turning, not a linear approximation ----
+    // A page hinged on a vertical spine sweeps through an arc as it turns:
+    // world x of its far edge = PAGE_W * cos(angle), where angle goes from
+    // 0 (flat right) to PI (flat left). For the FIRST HALF of that swing
+    // (0 to PI/2, i.e. flat-right to edge-on-to-camera) the page is still
+    // entirely on the right -- it hasn't reached the spine yet, let alone
+    // crossed to the left, it's only getting narrower as we see it more
+    // edge-on. Only in the SECOND HALF (PI/2 to PI) does it actually sweep
+    // out onto the left side. A linear interpolation of openLocal/closeLocal
+    // skips that: it starts sliding the shadow left from the very first
+    // instant of the swing, which is not how a hinged page actually moves.
+    // These two edges use the real cosine sweep instead:
+    var rightEdge = PAGE_W * Math.max(0, Math.cos(Math.PI * closeLocal));
+    var leftEdge = -PAGE_W * Math.max(0, -Math.cos(Math.PI * openLocal));
+    var shadowWidthNow = rightEdge - leftEdge;
+    var shadowCenterNow = (rightEdge + leftEdge) / 2;
+    dropShadow.scale.x = shadowWidthNow / PAGE_W;
+    // Fixed contact offset along the one defined light's direction (light
+    // sits up-left, so its shadow falls down-right) -- sign only, magnitude
+    // is the calibrated contact-shadow nudge.
+    dropShadow.position.x = shadowCenterNow + (SHADOW_LIGHT_DIR.x >= 0 ? 0.035 : -0.035);
+
+    // ---- lift shadow: follows whichever leaf is actively mid-turn ----
+    // The mental model: this book lies flat on a table, shot from above,
+    // one light up and to the left of frame. A page hinged at the spine
+    // swings through that table's plane -- cosine of its angle gives its
+    // in-plane (X) position, sine gives how far it has lifted off the
+    // table toward the camera/light. Three separate things follow from
+    // that lift, and all three now come from the same turnC/turnArc state
+    // instead of independent tuning:
+    //
+    // 1) IN-PLANE POSITION: the far edge sweeps from +PAGE_W (flat right)
+    //    through 0 (edge-on at the spine) to -PAGE_W (flat left) -- so the
+    //    shadow sits at the right, slides to the spine, then grows back
+    //    out on the left, matching the hinge itself rather than a faded
+    //    image swap.
+    //
+    // 2) SILHOUETTE WIDTH: a page seen edge-on presents almost no width to
+    //    the light, so its shadow narrows to a sliver at 90 degrees and is
+    //    full width at 0/180 -- wide on the right, thin through the
+    //    center, wide again on the left.
+    //
+    // 3) LIGHT-DIRECTION THROW: the higher a point lifts off the table,
+    //    the further its shadow is thrown away from the light -- hold a
+    //    card flat on a desk under a lamp and its shadow barely moves;
+    //    tilt it up and the shadow stretches out away from the lamp. That
+    //    lift is turnElevation = PAGE_W*sin(turnC*PI) -- the same
+    //    quantity driving the page's own swing above, at its largest
+    //    exactly at the edge-on midpoint. So the shadow doesn't just track
+    //    the page's flat (X) position -- as it rises through the turn it
+    //    also gets pulled down and to the right (this light's fixed
+    //    throw direction), on BOTH the right half of the swing and the
+    //    left half, peaking together with the silhouette going thinnest.
+    var turnFarX = PAGE_W * Math.cos(Math.PI * turnC);
+    var turnWidthFrac = Math.abs(Math.cos(Math.PI * turnC));
+    var turnElevation = PAGE_W * Math.sin(Math.PI * turnC);
+    var LIFT_THROW = 0.17;
+    liftShadow.position.x = turnFarX * 0.5 + SHADOW_LIGHT_DIR.x * turnElevation * LIFT_THROW;
+    liftShadow.position.y = SHADOW_LIGHT_DIR.y * turnElevation * LIFT_THROW;
+    liftShadow.scale.set(Math.max(0.02, turnWidthFrac), 1, 1);
+    liftShadowMat.opacity = 0.5 * Math.min(1, turnArc * 6);
+
+    updateBreezeShadow(breezeShadowR, breezeShadowMatR, frontRight, frontRight >= 0 ? leaves[frontRight].position.z : 0, breezeTime, breezeStrengthR);
+    updateBreezeShadow(breezeShadowL, breezeShadowMatL, frontLeft, frontLeft >= 0 ? leaves[frontLeft].position.z : 0, breezeTime, breezeStrengthL);
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(render);
+  }
+
+  function start(){
+    onResize();
+    loadingEl.style.opacity = '0';
+    setTimeout(function(){ loadingEl.style.display = 'none'; }, 500);
+    requestAnimationFrame(render);
+    loadAllPageImages();
+    initChapterTabs();
+    initAnt();
+  }
+
+  // ---------- occasional ant ----------
+  // A tiny creative easter egg: a small ink-toned ant occasionally strolls
+  // across the paper margin around the book -- never over the book itself.
+  // Pure 2D canvas overlay, fully independent of the WebGL scene/render
+  // loop, so it never interferes with the flip animation or its own RAF
+  // budget. Appears at random intervals (roughly every 10-30s), walks a
+  // short, gently wandering path along whichever screen edge it picked,
+  // then leaves off-screen and goes quiet again. Respects
+  // prefers-reduced-motion (skipped entirely, matching the rest of the site).
+  function initAnt(){
+    if(reduceMotion) return;
+    var canvas = document.getElementById('antLayer');
+    if(!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resizeAntCanvas(){
+      canvas.width = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resizeAntCanvas();
+    window.addEventListener('resize', resizeAntCanvas);
+
+    var INK = '#241F1A';
+    // Overall size multiplier for the whole drawing. The first version drew
+    // at ~1 local unit = 1px, which put the entire ant under ~10px long --
+    // at that size the legs are sub-pixel hairlines that dissolve into a
+    // faint smudge instead of reading as an insect. Everything below is
+    // still authored in the same small local coordinate space; this just
+    // blows the final drawing up to a size where the silhouette (and in
+    // particular the pinched thorax/abdomen waist that's the single most
+    // recognizable "this is an ant" cue) is actually legible.
+    var ANT_SCALE = 1.37; // 20% smaller than before
+    var ant = null; // active walk state, or null while idle
+    var idleUntil = performance.now() + (8000 + Math.random() * 14000);
+
+    // ---------- housefly: lands somewhere on the book during inactivity,
+    // bolts the instant real activity resumes ----------
+    // Reuses the exact same idle clock the wind breeze runs on
+    // (lastActivityTime, reset by the same mousemove/scroll/key listeners
+    // set up alongside it) -- "inactivity" should mean one consistent thing
+    // across every ambient effect on the page, not a separate timer per
+    // creature that could disagree with the others.
+    var FLY_SCALE = 2;
+    var FLY_INK = '#1c1a17';
+    var FLY_EYE = '#7a2320';
+    var FLY_IDLE_SECONDS = 9; // a little slower to arrive than the breeze
+    var fly = null; // { state:'entering'|'sitting'|'leaving', ... } or null while hidden
+    var flyCooldownUntil = performance.now() + 4000 + Math.random() * 6000;
+
+    function pickFlyLanding(){
+      var w = window.innerWidth, h = window.innerHeight;
+      // A generous central zone stands in for "somewhere on the book"
+      // without needing to project the book's exact 3D page geometry into
+      // screen space for what's ultimately a small ambient detail --
+      // cameraDistanceFor's own framing margin keeps the book roughly in
+      // this region on any screen size.
+      var tx = w * (0.3 + Math.random() * 0.4);
+      var ty = h * (0.22 + Math.random() * 0.5);
+      // Enters from whichever side is closer, so the approach is a short
+      // hop in from just off-frame rather than a trip across the screen.
+      var fromLeft = tx < w / 2;
+      var startX = fromLeft ? -30 : w + 30;
+      var startY = ty + (Math.random() * 160 - 80);
+      return { x: startX, y: startY, tx: tx, ty: ty };
+    }
+
+    function drawFly(x, y, angle, wingPhase, wingsOut){
+      // Same fixed-light contact shadow convention as the ant/book.
+      var dropPx = 1.6 * FLY_SCALE;
+      var sx = x + SHADOW_LIGHT_DIR.x * dropPx;
+      var sy = y - SHADOW_LIGHT_DIR.y * dropPx;
+      ctx.save();
+      ctx.filter = 'blur(1.1px)';
+      ctx.fillStyle = 'rgba(20,17,13,0.26)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 2.6 * FLY_SCALE, 1.5 * FLY_SCALE, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.scale(FLY_SCALE, FLY_SCALE);
+
+      // Wings: spread and flickering fast while airborne (or mid-flick at
+      // rest), folded flat along the body when calmly sitting.
+      if(wingsOut){
+        var flap = Math.sin(wingPhase) * 0.5 + 0.5;
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = '#e9edf2';
+        ctx.strokeStyle = 'rgba(60,60,60,0.4)';
+        ctx.lineWidth = 0.12;
+        [1, -1].forEach(function(side){
+          ctx.save();
+          ctx.translate(0.3, side * 0.6);
+          ctx.rotate(side * (0.35 + flap * 0.25));
+          ctx.beginPath();
+          ctx.ellipse(1.4, 0, 2.2, 0.95, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        });
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = 'rgba(40,38,34,0.5)';
+        [1, -1].forEach(function(side){
+          ctx.beginPath();
+          ctx.ellipse(-0.2, side * 0.5, 1.8, 0.35, side * 0.15, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      // Minimal legs -- just enough to read as standing rather than floating.
+      ctx.strokeStyle = FLY_INK;
+      ctx.lineWidth = 0.28;
+      ctx.lineCap = 'round';
+      [-0.9, 0.1, 1.0].forEach(function(ox){
+        [1, -1].forEach(function(side){
+          ctx.beginPath();
+          ctx.moveTo(ox, side * 0.9);
+          ctx.lineTo(ox + side * 0.15, side * 1.9);
+          ctx.stroke();
+        });
+      });
+
+      // Body: abdomen, thorax, head.
+      ctx.fillStyle = FLY_INK;
+      ctx.beginPath(); ctx.ellipse(-1.1, 0, 1.5,  1.15, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse( 0.5, 0, 1.05, 0.95, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse( 1.7, 0, 0.75, 0.7,  0, 0, Math.PI * 2); ctx.fill();
+
+      // Large red compound eyes -- the single most recognizable "this is a
+      // housefly, not just a dark speck" cue.
+      ctx.fillStyle = FLY_EYE;
+      ctx.beginPath(); ctx.ellipse(1.9, -0.42, 0.42, 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(1.9,  0.42, 0.42, 0.5, 0, 0, Math.PI * 2); ctx.fill();
+
+      ctx.restore();
+    }
+
+    // The book is always camera-framed with margin around it (see
+    // cameraDistanceFor/SIZE_MARGIN above), so a band right at the physical
+    // edge of the viewport is reliably clear of the book on any screen
+    // size -- that's the strip the ant is allowed to wander within.
+    var EDGE_START = 12, EDGE_MARGIN = 46;
+
+    function pickWalk(){
+      var w = window.innerWidth, h = window.innerHeight;
+      var edge = Math.floor(Math.random() * 4); // 0 top, 1 bottom, 2 left, 3 right
+      var horizontal = (edge === 0 || edge === 1);
+      var fromStart = Math.random() < 0.5; // which direction it travels along the edge
+      var cMin, cMax; // the band, in the axis perpendicular to travel, it's allowed to wander within
+      if(edge === 0){ cMin = EDGE_START; cMax = EDGE_START + EDGE_MARGIN; }
+      else if(edge === 1){ cMax = h - EDGE_START; cMin = cMax - EDGE_MARGIN; }
+      else if(edge === 2){ cMin = EDGE_START; cMax = EDGE_START + EDGE_MARGIN; }
+      else { cMax = w - EDGE_START; cMin = cMax - EDGE_MARGIN; }
+
+      var perp = cMin + Math.random() * (cMax - cMin);
+      var dir = fromStart ? 1 : -1;
+      var x, y;
+      if(horizontal){ x = fromStart ? -34 : w + 34; y = perp; }
+      else { y = fromStart ? -34 : h + 34; x = perp; }
+
+      var baseHeading = horizontal ? (dir > 0 ? 0 : Math.PI) : (dir > 0 ? Math.PI/2 : -Math.PI/2);
+
+      // Sometimes it's a single ant, sometimes a short line of them --
+      // real ant trails are almost never exactly one ant, and rarely more
+      // than a handful, so this is weighted toward solo/pairs with
+      // occasional longer lines rather than a flat 1-4 pick.
+      var countRoll = Math.random();
+      var antCount = countRoll < 0.42 ? 1 : countRoll < 0.70 ? 2 : countRoll < 0.88 ? 3 : 4;
+      var speed = 58 + Math.random() * 34; // faster, brisker walking pace
+      var followers = [];
+      var cumDelay = 0;
+      for(var fi = 1; fi < antCount; fi++){
+        // Space by a target pixel gap (~1.3-2.2x an ant's own body length)
+        // rather than a fixed time, converted through this walk's own
+        // speed -- a raw time delay reads as nose-to-tail crowding at slow
+        // speeds and as an oddly spread-out line at fast ones.
+        cumDelay += (26 + Math.random() * 22) / speed;
+        followers.push({ delay: cumDelay });
+      }
+
+      return {
+        x:x, y:y, horizontal:horizontal, dir:dir, cMin:cMin, cMax:cMax,
+        speed: speed,
+        heading: baseHeading, headingOffset: 0,
+        // Two slow sine components (different, non-matching periods) sum
+        // into one organic, never-repeating meander -- this is what bends
+        // the path into the same kind of easy S-curve winding as a real
+        // ant trail, entirely through smooth, continuous curvature. There
+        // is no timer, no discrete "decide to turn now" event anywhere in
+        // this walk -- direction is always changing gradually, never
+        // snapping, so there's nothing that can read as a skid or a stop.
+        wF1: 0.28 + Math.random() * 0.22, wP1: Math.random() * Math.PI * 2,
+        wF2: 0.7 + Math.random() * 0.5,   wP2: Math.random() * Math.PI * 2,
+        // Followers don't run their own independent simulation -- they
+        // replay the leader's own recorded (x,y,heading,legPhase) history
+        // at a fixed delay, so the whole line traces exactly the same
+        // curve the leader drew, just staggered in time. That's what
+        // makes it read as one flowing trail rather than several ants
+        // each independently wandering near each other.
+        followers: followers, history: [],
+        legPhase: 0, t: 0
+      };
+    }
+
+    function drawAnt(x, y, angle, legPhase){
+      // Contact shadow, drawn first and in plain screen space -- not
+      // inside the rotate/scale block the body uses below -- so it stays
+      // pinned to the site's one fixed light direction (SHADOW_LIGHT_DIR,
+      // the same upper-left key light the book's own shadows are built
+      // from) regardless of which way the ant is currently facing. A
+      // small soft blob offset toward the shadow side reads as "this is a
+      // tiny thing sitting on the paper" rather than a flat decal glued
+      // to the screen -- the same reasoning as the book's dropShadow/
+      // liftShadow, just far smaller since the ant itself is far smaller.
+      var dropPx = 2.0 * ANT_SCALE;
+      var sx = x + SHADOW_LIGHT_DIR.x * dropPx;
+      var sy = y - SHADOW_LIGHT_DIR.y * dropPx; // world +y is up, canvas +y is down
+      ctx.save();
+      ctx.filter = 'blur(1.4px)';
+      ctx.fillStyle = 'rgba(20,17,13,0.30)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 4.3 * ANT_SCALE, 2.0 * ANT_SCALE, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.scale(ANT_SCALE, ANT_SCALE);
+      ctx.strokeStyle = INK;
+      ctx.fillStyle = INK;
+      ctx.lineCap = 'round';
+
+      // Local +x is the direction of travel (the angle passed in already
+      // points that way), so the head sits at positive x and the abdomen
+      // trails behind at negative x -- the earlier version had these
+      // reversed, which made the ant travel abdomen-first. That reads as
+      // subtly "wrong" even when you can't immediately say why, which was
+      // very likely a big part of what didn't feel like a real ant.
+      //
+      // 6 legs, tripod gait: front-left+mid-right+back-left swing together,
+      // opposite to mid-left+front-right+back-right -- the alternating
+      // triad pattern real ants (and most hexapods) actually walk with.
+      // Drawn as a single curve through a knee point rather than two
+      // straight segments, so each leg reads as an organic limb instead of
+      // a schematic tick mark.
+      ctx.lineWidth = 0.62;
+      var legDefs = [
+        { ox: 2.0, side: 1, tripod:0 },
+        { ox: 0.2, side: 1, tripod:1 },
+        { ox:-1.6, side: 1, tripod:0 },
+        { ox: 2.0, side:-1, tripod:1 },
+        { ox: 0.2, side:-1, tripod:0 },
+        { ox:-1.6, side:-1, tripod:1 }
+      ];
+      legDefs.forEach(function(leg){
+        var phase = legPhase + (leg.tripod ? Math.PI : 0);
+        var swing = Math.sin(phase) * 2.1;
+        var lift = Math.max(0, Math.cos(phase)) * 0.5;
+        var kx = leg.ox + swing * 0.45;
+        var ky = leg.side * (2.7 + lift * 0.4);
+        var fx = leg.ox + swing * 1.15;
+        var fy = leg.side * 5.3;
+        ctx.beginPath();
+        ctx.moveTo(leg.ox, leg.side * 1.05);
+        ctx.quadraticCurveTo(kx, ky, fx, fy);
+        ctx.stroke();
+      });
+
+      // antennae, forward of the head, swaying independent of the gait
+      ctx.lineWidth = 0.45;
+      var wiggle = Math.sin(legPhase * 0.45) * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(3.7, -0.55); ctx.quadraticCurveTo(4.6, -1.3, 5.6, -1.9 + wiggle);
+      ctx.moveTo(3.7,  0.55); ctx.quadraticCurveTo(4.6,  1.3, 5.6,  1.9 - wiggle);
+      ctx.stroke();
+
+      // body: head, thorax, a narrow petiole "waist", then abdomen -- that
+      // pinch between thorax and abdomen is the single detail that makes a
+      // small dark blob read as an ant rather than a generic bug or a
+      // smudge, so it's worth its own segment rather than folding into a
+      // continuous taper.
+      ctx.beginPath(); ctx.ellipse( 4.0,  0, 1.15, 1.05, 0, 0, Math.PI*2); ctx.fill(); // head
+      ctx.beginPath(); ctx.ellipse( 1.5,  0, 1.55, 1.25, 0, 0, Math.PI*2); ctx.fill(); // thorax
+      ctx.beginPath(); ctx.ellipse(-0.65, 0, 0.55, 0.5,  0, 0, Math.PI*2); ctx.fill(); // petiole/waist
+      ctx.beginPath(); ctx.ellipse(-3.3,  0, 2.9,  1.95, 0, 0, Math.PI*2); ctx.fill(); // abdomen
+
+      ctx.restore();
+    }
+
+    function isExited(px, py, horizontal, dir, w, h){
+      return horizontal
+        ? (dir > 0 ? px > w + 34 : px < -34)
+        : (dir > 0 ? py > h + 34 : py < -34);
+    }
+
+    function angleLerp(a, b, t){
+      var d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+      if(d < -Math.PI) d += Math.PI * 2;
+      return a + d * t;
+    }
+
+    // Linear-interpolates the leader's recorded path to whatever exact
+    // instant a follower needs -- history is sampled once per animation
+    // frame, so a follower's delay almost never lands exactly on a
+    // recorded timestamp.
+    function sampleHistory(history, targetT){
+      if(history.length === 0) return null;
+      if(targetT <= history[0].t) return history[0];
+      var last = history[history.length - 1];
+      if(targetT >= last.t) return last;
+      for(var i = 1; i < history.length; i++){
+        if(history[i].t >= targetT){
+          var a = history[i - 1], b = history[i];
+          var span = b.t - a.t;
+          var frac = span > 0 ? (targetT - a.t) / span : 0;
+          return {
+            x: a.x + (b.x - a.x) * frac,
+            y: a.y + (b.y - a.y) * frac,
+            heading: angleLerp(a.heading, b.heading, frac),
+            legPhase: a.legPhase + (b.legPhase - a.legPhase) * frac
+          };
+        }
+      }
+      return last;
+    }
+
+    var lastTime = performance.now();
+    function tick(now){
+      var dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      if(!ant){
+        if(now >= idleUntil) ant = pickWalk();
+      } else {
+        ant.t += dt;
+        var w = window.innerWidth, h = window.innerHeight;
+        var baseFwd = ant.horizontal
+          ? (ant.dir > 0 ? 0 : Math.PI)
+          : (ant.dir > 0 ? Math.PI/2 : -Math.PI/2);
+
+        // The path is one continuous curve, never a straight line and
+        // never a stop-turn-go sequence either -- ant.headingOffset (the
+        // live deviation from dead-ahead) is eased every frame toward a
+        // "desired" offset that blends two things:
+        //
+        // 1) an organic meander -- the sum of two slow sine waves defined
+        //    in pickWalk(), which winds the path into the same kind of
+        //    easy S-curve as a real ant trail purely through gradual
+        //    curvature, with nothing that could read as a discrete event.
+        //
+        // 2) a gentle pull back toward the center of the wander band the
+        //    closer the ant gets to its edge, so it stays clear of the
+        //    book without ever needing a hard clamp or a snap.
+        //
+        // Because this is a single continuous first-order lag (not a mode
+        // switch, not a pause), the heading -- and so the body's own
+        // rotation -- glides through every degree in between. There is no
+        // instant the facing direction jumps, which is what the earlier
+        // stop-and-reorient version was doing and what read as skidding.
+        var perpNow = ant.horizontal ? ant.y : ant.x;
+        var mid = (ant.cMin + ant.cMax) / 2;
+        var half = (ant.cMax - ant.cMin) / 2;
+        var normPerp = half > 0 ? (perpNow - mid) / half : 0; // -1..1
+        var k = ant.horizontal ? 1 : -1;
+        var boundaryOffset = -normPerp * k * ant.dir * 0.9;
+
+        var meander = 0.5 * Math.sin(ant.t * ant.wF1 + ant.wP1)
+                    + 0.32 * Math.sin(ant.t * ant.wF2 + ant.wP2);
+
+        var desiredOffset = Math.max(-1.2, Math.min(1.2, boundaryOffset + meander));
+        ant.headingOffset += (desiredOffset - ant.headingOffset) * Math.min(1, dt * 1.6);
+        ant.heading = baseFwd + ant.headingOffset;
+
+        // cos(headingOffset) stays positive for the whole clamped range
+        // above, so forward (exit-ward) progress never stalls or reverses
+        // -- the curve always advances, it just advances along a bend.
+        ant.x += Math.cos(ant.heading) * ant.speed * dt;
+        ant.y += Math.sin(ant.heading) * ant.speed * dt;
+
+        ant.legPhase += dt * (8 + ant.speed * 0.35);
+
+        // Record this frame's state so any followers can replay it later
+        // at their own delay -- see the note on `followers` in pickWalk().
+        ant.history.push({ t: ant.t, x: ant.x, y: ant.y, heading: ant.heading, legPhase: ant.legPhase });
+        var maxDelay = ant.followers.length ? ant.followers[ant.followers.length - 1].delay : 0;
+        while(ant.history.length > 2 && ant.history[1].t < ant.t - maxDelay - 0.5) ant.history.shift();
+
+        var leaderExited = isExited(ant.x, ant.y, ant.horizontal, ant.dir, w, h);
+        if(!leaderExited) drawAnt(ant.x, ant.y, ant.heading, ant.legPhase);
+
+        // Each follower is just a delayed read of the leader's own path --
+        // it only starts existing once enough time has passed for its
+        // delay to "arrive" at the leader's start point, which is what
+        // makes the line fill in one at a time rather than all popping in
+        // together.
+        ant.followers.forEach(function(f){
+          var sampleT = ant.t - f.delay;
+          if(sampleT < 0) return;
+          var s = sampleHistory(ant.history, sampleT);
+          if(!s || isExited(s.x, s.y, ant.horizontal, ant.dir, w, h)) return;
+          drawAnt(s.x, s.y, s.heading, s.legPhase);
+        });
+
+        // The line as a whole is only done once its trailing-most member
+        // (whichever one is furthest behind -- the leader itself if
+        // walking solo) has exited, not the instant the leader does --
+        // otherwise followers still mid-screen would just vanish.
+        var trailSampleT = ant.t - maxDelay;
+        var trailExited = false;
+        if(maxDelay === 0){
+          trailExited = leaderExited;
+        } else if(trailSampleT >= 0){
+          var trailSample = sampleHistory(ant.history, trailSampleT);
+          trailExited = !!trailSample && isExited(trailSample.x, trailSample.y, ant.horizontal, ant.dir, w, h);
+        }
+
+        if((trailSampleT >= 0 && trailExited) || ant.t > 60 + maxDelay){
+          ant = null;
+          idleUntil = now + (10000 + Math.random() * 18000);
+        }
+      }
+
+      // ---- housefly ----
+      var flyIdleSeconds = (now - lastActivityTime) / 1000;
+      if(!fly){
+        if(now >= flyCooldownUntil && flyIdleSeconds > FLY_IDLE_SECONDS){
+          var spot = pickFlyLanding();
+          var flyDx = spot.tx - spot.x, flyDy = spot.ty - spot.y;
+          var entryHeading = Math.atan2(flyDy, flyDx);
+          var entryDist = Math.max(1, Math.hypot(flyDx, flyDy));
+          // Bow the approach sideways into a real arc (a fraction of the
+          // travel distance, either side at random) instead of a straight
+          // slide -- a quadratic-bezier control point off the midpoint.
+          var curveMag = Math.min(150, Math.max(35, entryDist * (0.15 + Math.random() * 0.15))) * (Math.random() < 0.5 ? -1 : 1);
+          var midX = (spot.x + spot.tx) / 2, midY = (spot.y + spot.ty) / 2;
+          var perpX = -Math.sin(entryHeading), perpY = Math.cos(entryHeading);
+          fly = {
+            state: 'entering',
+            x: spot.x, y: spot.y, tx: spot.tx, ty: spot.ty,
+            startX: spot.x, startY: spot.y,
+            ctrlX: midX + perpX * curveMag, ctrlY: midY + perpY * curveMag - 16,
+            entryHeading: entryHeading,
+            heading: entryHeading,
+            wingPhase: 0, t: 0,
+            // Unhurried arrival speed -- noticeably slower than the
+            // startled dart it leaves with below.
+            enterDur: Math.max(0.9, entryDist / (380 + Math.random() * 70)),
+            flicking: 0, nextFlick: 1.5 + Math.random() * 3
+          };
+        }
+      } else {
+        fly.t += dt;
+        fly.wingPhase += dt * 60;
+
+        if(fly.state === 'entering'){
+          // A slow, curved arc in from off-frame -- a quadratic bezier
+          // through the sideways-bowed control point above -- reading as
+          // a real, unhurried flight rather than a sprite sliding into
+          // place along a straight line.
+          var edur = fly.enterDur;
+          var ep = Math.min(1, fly.t / edur);
+          var s = ep * ep * (3 - 2 * ep); // smootherstep ease-in-out
+          var omt = 1 - s;
+          fly.x = omt * omt * fly.startX + 2 * omt * s * fly.ctrlX + s * s * fly.tx;
+          fly.y = omt * omt * fly.startY + 2 * omt * s * fly.ctrlY + s * s * fly.ty;
+          var tanX = 2 * omt * (fly.ctrlX - fly.startX) + 2 * s * (fly.tx - fly.ctrlX);
+          var tanY = 2 * omt * (fly.ctrlY - fly.startY) + 2 * s * (fly.ty - fly.ctrlY);
+          if(tanX !== 0 || tanY !== 0) fly.heading = Math.atan2(tanY, tanX);
+          drawFly(fly.x, fly.y, fly.heading, fly.wingPhase, true);
+          if(ep >= 1){
+            fly.state = 'sitting';
+            fly.t = 0;
+            fly.x = fly.tx;
+            fly.y = fly.ty;
+          }
+        } else if(fly.state === 'sitting'){
+          // Bolts the instant real activity resumes -- flyIdleSeconds is
+          // already back near 0 the moment the very listener that feeds it
+          // fires, same mechanism the wind breeze interrupts on.
+          if(flyIdleSeconds < 0.15){
+            fly.state = 'leaving';
+            fly.t = 0;
+            // A startled fly bolts in a fresh direction -- kept well away
+            // from the reverse of how it flew in, so it never reads as
+            // retracing its own path back out -- and banks into a curve
+            // via a steady turn rate rather than flying a straight line.
+            var avoidHeading = fly.entryHeading + Math.PI;
+            var minGap = 75 * Math.PI / 180;
+            fly.leaveHeading = avoidHeading + minGap + Math.random() * (Math.PI * 2 - 2 * minGap);
+            fly.leaveTurnRate = (Math.random() < 0.5 ? -1 : 1) * (1.0 + Math.random() * 1.8);
+            drawFly(fly.x, fly.y, fly.leaveHeading, fly.wingPhase, true);
+          } else {
+            fly.nextFlick -= dt;
+            if(fly.nextFlick <= 0){
+              fly.flicking = 0.25;
+              fly.nextFlick = 2 + Math.random() * 4;
+            }
+            if(fly.flicking > 0) fly.flicking -= dt;
+            drawFly(fly.x, fly.y, fly.heading, fly.wingPhase, fly.flicking > 0);
+          }
+        } else if(fly.state === 'leaving'){
+          // A sudden, much faster dart than the arrival -- our presence
+          // startled it -- curving away on a steady bank instead of a
+          // straight line.
+          var lspeed = 900;
+          fly.leaveHeading += fly.leaveTurnRate * dt;
+          fly.x += Math.cos(fly.leaveHeading) * lspeed * dt;
+          fly.y += Math.sin(fly.leaveHeading) * lspeed * dt - 55 * dt; // climbs as it curves away
+          fly.heading = fly.leaveHeading;
+          drawFly(fly.x, fly.y, fly.heading, fly.wingPhase, true);
+          if(fly.x < -40 || fly.x > window.innerWidth + 40 || fly.y < -40 || fly.y > window.innerHeight + 40 || fly.t > 1.1){
+            fly = null;
+            flyCooldownUntil = now + 6000 + Math.random() * 14000;
+          }
+        }
+      }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- fore-edge chapter tabs ----------
+  var NAV_POINTS = [
+    { label: 'Opening',  scaled: 0 },
+    { label: 'Contents', scaled: PAUSE + 1 },
+    { label: 'About',    scaled: PAUSE + 4 },
+    { label: 'Works',    scaled: PAUSE + 8 },
+    { label: 'Contact',  scaled: PAUSE + QR_LEAF_INDEX }
+  ];
+
+  function scrollYForScaled(scaled){
+    var vh = window.innerHeight;
+    var maxScroll = spacerHeight - vh;
+    var progress = scaled / TOTAL_UNITS;
+    return progress * maxScroll;
+  }
+
+  var scrollAnimFrame = null;
+
+  function animateScrollTo(targetY, fromScaled, toScaled){
+    if(scrollAnimFrame) cancelAnimationFrame(scrollAnimFrame);
+
+    if(reduceMotion){
+      window.scrollTo(0, targetY);
+      return;
+    }
+
+    var startY = window.scrollY;
+    var distanceUnits = Math.abs(toScaled - fromScaled);
+    var duration = Math.min(700 + distanceUnits * 260, 2400);
+    var startTime = performance.now();
+
+    function step(now){
+      var t = Math.min((now - startTime) / duration, 1);
+      var eased = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+      window.scrollTo(0, startY + (targetY - startY) * eased);
+      if(t < 1){
+        scrollAnimFrame = requestAnimationFrame(step);
+      } else {
+        scrollAnimFrame = null;
+      }
+    }
+    scrollAnimFrame = requestAnimationFrame(step);
+  }
+
+  function currentScaled(){
+    var vh = window.innerHeight;
+    var maxScroll = spacerHeight - vh;
+    var progress = maxScroll > 0 ? Math.min(Math.max(window.scrollY / maxScroll, 0), 1) : 0;
+    return progress * TOTAL_UNITS;
+  }
+
+  var chapterTabEls = [];
+  var activeTabIdx = -1;
+
+  function updateActiveTab(){
+    var cs = currentScaled();
+    var closestIdx = 0, closestDist = Infinity;
+    NAV_POINTS.forEach(function(p, idx){
+      var d = Math.abs(p.scaled - cs);
+      if(d < closestDist){ closestDist = d; closestIdx = idx; }
+    });
+    if(closestIdx === activeTabIdx) return;
+    activeTabIdx = closestIdx;
+    chapterTabEls.forEach(function(tab, idx){
+      tab.classList.toggle('active', idx === closestIdx);
+    });
+  }
+
+  // Native 'scroll' events can fire far more often than the display can
+  // paint (especially with trackpad momentum), and each handler call was
+  // re-querying the DOM -- that extra work competing with the WebGL render
+  // loop on the main thread is a common cause of stutter while scrolling.
+  // Coalesce it to once per animation frame instead.
+  var activeTabQueued = false;
+  function queueActiveTabUpdate(){
+    if(activeTabQueued) return;
+    activeTabQueued = true;
+    requestAnimationFrame(function(){
+      activeTabQueued = false;
+      updateActiveTab();
+    });
+  }
+
+  function initChapterTabs(){
+    var rail = document.getElementById('chapterTabs');
+    NAV_POINTS.forEach(function(p){
+      var btn = document.createElement('button');
+      btn.className = 'chapter-tab';
+      btn.textContent = p.label;
+      btn.addEventListener('click', function(){
+        var from = currentScaled();
+        animateScrollTo(scrollYForScaled(p.scaled), from, p.scaled);
+      });
+      rail.appendChild(btn);
+      chapterTabEls.push(btn);
+    });
+    window.addEventListener('scroll', queueActiveTabUpdate, { passive:true });
+    updateActiveTab();
+  }
+
+
+  function drawImageCover(ctx, img, w, h){
+    var ir = img.width / img.height, tr = w / h;
+    var sx, sy, sw, sh;
+    if(ir > tr){
+      sh = img.height; sw = sh * tr; sx = (img.width - sw) / 2; sy = 0;
+    } else {
+      sw = img.width; sh = sw / tr; sx = 0; sy = (img.height - sh) / 2;
+    }
+    // Source photos land here at up to 13500x18000 and get squeezed into a
+    // texture canvas a fraction of that size -- the browser's default
+    // downscale filter (imageSmoothingQuality defaults to a cheaper setting
+    // than 'high' in most engines) visibly softened fine linework and text
+    // at that ratio. Forcing 'high' uses a proper multi-step/area filter
+    // instead, which is what was actually missing, not just resolution.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  }
+
+  function textureFromImage(img, side){
+    var w = 2048, h = Math.round(2048 * (PAGE_H / PAGE_W));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    drawImageCover(ctx, img, w, h);
+    paintPageVignette(ctx, w, h, side === 'front' ? 'left' : 'right');
+    drawGutterShadow(ctx, w, h, side === 'front' ? 'left' : 'right');
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return tex;
+  }
+
+  function applyTextureToFace(leafIndex, side, tex){
+    var g = leaves[leafIndex];
+    var isCover = g.userData.isCover;
+
+    // Only plane-based paper leaves need the UV flip on their back face —
+    // the shared geometry there has one UV set, so the back (viewed from
+    // behind) needs correcting. BoxGeometry covers already have independent,
+    // correctly-oriented UVs per face and must NOT be flipped again.
+    if(!isCover && side === 'back'){
+      // See the matching flip in buildLeaf -- ClampToEdgeWrapping avoids the
+      // opposite-edge bleed that RepeatWrapping caused at the u=0/u=1 seam.
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.repeat.x = -1;
+      tex.offset.x = 1;
+    }
+
+    if(isCover){
+      var mats = g.children[0].material;
+      var idx = side === 'front' ? 4 : 5;
+      if(mats[idx].map) mats[idx].map.dispose();
+      mats[idx].map = tex;
+      mats[idx].needsUpdate = true;
+    } else {
+      g.children.forEach(function(mesh){
+        var isFront = mesh.material.side === THREE.FrontSide;
+        if((side === 'front') === isFront){
+          if(mesh.material.map) mesh.material.map.dispose();
+          mesh.material.map = tex;
+          mesh.material.needsUpdate = true;
+        }
+      });
+    }
+  }
+
+
+  var fontSpecs = [
+    '400 40px "Fraunces"', '500 40px "Fraunces"',
+    '400 20px "Space Grotesk"', '500 20px "Space Grotesk"',
+    '400 16px "IBM Plex Mono"', '500 16px "IBM Plex Mono"'
+  ];
+  if(document.fonts && document.fonts.load){
+    Promise.all(fontSpecs.map(function(f){ return document.fonts.load(f).catch(function(){}); }))
+      .then(function(){ return document.fonts.ready; })
+      .then(function(){
+        leaves.forEach(function(g, i){
+          if(g.userData.isCover){
+            var mesh = g.children[0];
+            var mats = mesh.material;
+            var oldFront = mats[4].map, oldBack = mats[5].map;
+            mats[4].map = makeTexture(PAGES[i].front, 'left');
+            mats[5].map = makeTexture(PAGES[i].back, 'right');
+            mats[4].needsUpdate = true;
+            mats[5].needsUpdate = true;
+            oldFront.dispose();
+            oldBack.dispose();
+          } else {
+            g.children.forEach(function(mesh){
+              var isFront = mesh.material.side === THREE.FrontSide;
+              var tex = mesh.material.map;
+              var newTex = makeTexture(isFront ? PAGES[i].front : PAGES[i].back, isFront ? 'left' : 'right');
+              if(!isFront){
+                // See the matching flip in buildLeaf -- ClampToEdgeWrapping
+                // avoids the opposite-edge bleed that RepeatWrapping caused.
+                newTex.wrapS = THREE.ClampToEdgeWrapping;
+                newTex.repeat.x = -1;
+                newTex.offset.x = 1;
+              }
+              mesh.material.map = newTex;
+              mesh.material.needsUpdate = true;
+              tex.dispose();
+            });
+          }
+        });
+        start();
+      })
+      .catch(start);
+  } else {
+    start();
+  }
+
+
+  // ---- SCAN interaction ----
+  var _scanActive = false;
+  var _scanTimer  = null;
+
+  window.triggerScan = function(){
+    if(_scanActive) return;
+    _scanActive = true;
+
+    var scanBtn = document.getElementById('scanBtn');
+    if(scanBtn) scanBtn.textContent = 'OPENING…';
+    // Hide the overlay div itself while scan is active (RAF loop skips it via _scanActive)
+    var scanOvEl = document.getElementById('scanOverlay');
+    if(scanOvEl){ scanOvEl.style.opacity = '0'; scanOvEl.style.pointerEvents = 'none'; }
+
+    // ── Step 1: Scroll book to perfectly flat open position ──────────────
+    // For leaf 2 to be front-right and fully flat:
+    //   state[2].target = clamp(scaled - (PAUSE+2), 0,1) = 0
+    //   → scaled = PAUSE + 2 = 2.6
+    //   → progress = scaled / TOTAL_UNITS = 2.6 / 5.2 = 0.5
+    //   → scrollY = 0.5 * maxScroll
+    var targetScroll = (PAUSE + QR_LEAF_INDEX + 1) / TOTAL_UNITS * (spacerHeight - window.innerHeight);
+    // Guard: spacerHeight might be 0 on first load — recompute if needed
+    if(spacerHeight <= 0) layoutSpacer();
+    if(targetScroll < 0 || !isFinite(targetScroll)) targetScroll = 0;
+    window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+
+    // ── Step 2: After scroll + easing settle, show hand ──────────────────
+    setTimeout(function(){
+      if(!_scanActive) return;
+
+      if(scanBtn) scanBtn.textContent = 'SCANNING…';
+
+      var hand    = document.getElementById('handContainer');
+      var dismiss = document.getElementById('handDismiss');
+
+      // Position hand so phone screen centre lands on page centre
+      if(hand && camera){
+        var qrWorld = new THREE.Vector3(-PAGE_W * 0.5, 0, 0.02);
+        var ndc     = qrWorld.clone().project(camera);
+        var sx = ( ndc.x + 1) * 0.5 * window.innerWidth;
+        var sy = (-ndc.y + 1) * 0.5 * window.innerHeight;
+
+        var cw = Math.min(window.innerWidth * 0.70, 720);
+        var ch = cw * (13909 / 9913);
+        var offsetX = cw * 0.510;
+        var offsetY = ch * 0.405;
+
+        hand.style.left   = (sx - offsetX) + 'px';
+        hand.style.top    = (sy - offsetY) + 'px';
+        hand.style.width  = cw + 'px';
+        hand.style.height = ch + 'px';
+      }
+
+      // Animate hand in
+      if(hand){
+        hand.classList.remove('departing');
+        void hand.offsetWidth;
+        hand.classList.add('scanning');
+      }
+      if(dismiss) dismiss.classList.add('active');
+
+      // ── Step 3: After 2.4s — flash, audio, music player ──────────────
+      _scanTimer = setTimeout(function(){
+        var flash = document.getElementById('scanFlash');
+        if(flash){
+          flash.classList.add('on');
+          setTimeout(function(){ flash.classList.remove('on'); }, 350);
+        }
+
+        var audio = document.getElementById('bookAudio');
+        if(audio && audio.src && audio.src !== window.location.href && audio.src !== ''){
+          audio.play().catch(function(){});
+          var pill = document.getElementById('nowPlaying');
+          if(pill){ pill.classList.add('show'); }
+        }
+
+        if(scanBtn) scanBtn.textContent = '▶  SCAN';
+
+        // Show music player, hide scanner UI
+        var mpEl   = document.getElementById('musicPlayer');
+        var scanUI = document.getElementById('scanUI');
+        if(scanUI) scanUI.style.display = 'none';
+        if(mpEl){
+          mpEl.classList.add('active');
+          var hd = document.getElementById('handDismiss');
+          if(hd) hd.style.pointerEvents = 'none';
+          if(audio){
+            var pi = document.getElementById('mp-play-icon');
+            var pa = document.getElementById('mp-pause-icon');
+            if(pi) pi.style.display = 'none';
+            if(pa) pa.style.display = '';
+            mpEl.classList.add('playing');
+            mpStartProgress(audio);
+            mpUpdateUI(audio);
+          }
+        }
+      }, 2400);
+
+    }, 900); // wait for smooth scroll + Three.js easing to settle
+  };
+
+  window.closeHandOverlay = function(){
+    _scanActive = false;
+    if(_scanTimer){ clearTimeout(_scanTimer); _scanTimer = null; }
+
+    var hand    = document.getElementById('handContainer');
+    var dismiss = document.getElementById('handDismiss');
+    var pill    = document.getElementById('nowPlaying');
+    var scanBtn = document.getElementById('scanBtn');
+
+    if(hand){
+      hand.classList.remove('scanning');
+      void hand.offsetWidth;
+      hand.classList.add('departing');
+    }
+    if(dismiss) dismiss.classList.remove('active');
+    if(pill) pill.classList.remove('show');
+    if(scanBtn) scanBtn.textContent = '▶  SCAN';
+
+    // stop audio
+    var audio = document.getElementById('bookAudio');
+    if(audio){ audio.pause(); audio.currentTime = 0; }
+    // Reset music player
+    var mpEl   = document.getElementById('musicPlayer');
+    var scanUI = document.getElementById('scanUI');
+    var hd2    = document.getElementById('handDismiss');
+    if(hd2) hd2.style.pointerEvents = '';
+    if(mpEl){ mpEl.classList.remove('active','playing'); }
+    if(scanUI) scanUI.style.display = '';
+    if(_mpProgressTimer){ clearInterval(_mpProgressTimer); _mpProgressTimer = null; }
+    var pi = document.getElementById('mp-play-icon');
+    var pa = document.getElementById('mp-pause-icon');
+    if(pi) pi.style.display = '';
+    if(pa) pa.style.display = 'none';
+    var fill = document.getElementById('mp-progress-fill');
+    var dot  = document.getElementById('mp-progress-dot');
+    if(fill) fill.style.width = '0%';
+    if(dot)  dot.style.left   = '0%';
+
+    // clean up departing class after animation
+    setTimeout(function(){
+      var h = document.getElementById('handContainer');
+      if(h) h.classList.remove('departing');
+    }, 550);
+  };
+
+  // Escape key dismisses
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') window.closeHandOverlay();
+  });
+  // Clicking outside the page-spread also dismisses
+  document.getElementById('handDismiss') && document.getElementById('handDismiss').addEventListener('click', window.closeHandOverlay);
+
+})();
+</script>
+<script>
+  var _mpProgressTimer = null;
+
+  function mpFmtTime(s){
+    if(isNaN(s)||!isFinite(s)||s<0) return '0:00';
+    var m = Math.floor(s/60), sec = Math.floor(s%60);
+    return m + ':' + (sec<10?'0':'') + sec;
+  }
+
+  function mpUpdateUI(audio){
+    if(!audio) return;
+    var pct  = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
+    var fill = document.getElementById('mp-progress-fill');
+    var dot  = document.getElementById('mp-progress-dot');
+    var cur  = document.getElementById('mp-cur');
+    var dur  = document.getElementById('mp-dur');
+    if(fill) fill.style.width = pct + '%';
+    if(dot)  dot.style.left   = pct + '%';
+    if(cur)  cur.textContent  = mpFmtTime(audio.currentTime);
+    if(dur)  dur.textContent  = mpFmtTime(audio.duration);
+  }
+
+  function mpStartProgress(audio){
+    if(!audio) audio = document.getElementById('bookAudio');
+    if(_mpProgressTimer) clearInterval(_mpProgressTimer);
+    _mpProgressTimer = setInterval(function(){
+      if(!audio) return;
+      mpUpdateUI(audio);
+      if(audio.ended){
+        clearInterval(_mpProgressTimer);
+        var pi = document.getElementById('mp-play-icon');
+        var pa = document.getElementById('mp-pause-icon');
+        var mp = document.getElementById('musicPlayer');
+        if(pi) pi.style.display = '';
+        if(pa) pa.style.display = 'none';
+        if(mp) mp.classList.remove('playing');
+      }
+    }, 300);
+  }
+
+  window.mpToggle = function(){
+    var audio = document.getElementById('bookAudio');
+    var mp    = document.getElementById('musicPlayer');
+    var pi    = document.getElementById('mp-play-icon');
+    var pa    = document.getElementById('mp-pause-icon');
+    if(!audio) return;
+    if(audio.paused){
+      audio.play().catch(function(){});
+      if(pi) pi.style.display = 'none';
+      if(pa) pa.style.display = '';
+      if(mp) mp.classList.add('playing');
+      mpStartProgress(audio);
+    } else {
+      audio.pause();
+      if(pi) pi.style.display = '';
+      if(pa) pa.style.display = 'none';
+      if(mp) mp.classList.remove('playing');
+    }
+  };
+
+  window.mpPrev = function(){
+    var audio = document.getElementById('bookAudio');
+    if(!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 10);
+    mpUpdateUI(audio);
+  };
+
+  window.mpNext = function(){
+    var audio = document.getElementById('bookAudio');
+    if(!audio) return;
+    audio.currentTime = Math.min(audio.duration||0, audio.currentTime + 10);
+    mpUpdateUI(audio);
+  };
+
+  // ── Live clock for scan screen ──────────────────────
+  function updateScanClock(){
+    var now = new Date();
+    var h = now.getHours(), m = now.getMinutes();
+    var ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    var time = h + ':' + (m < 10 ? '0' : '') + m;
+    var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var dateStr = DAYS[now.getDay()] + ', ' + now.getDate() + ' ' + MONS[now.getMonth()];
+    var st = document.getElementById('scanUI-time');
+    var sd = document.getElementById('scanUI-date');
+    var mp = document.getElementById('mp-statusbar-time');
+    if(st) st.textContent = time + ' ' + ap;
+    if(sd) sd.textContent = dateStr;
+    if(mp) mp.textContent = time;
+  }
+  updateScanClock();
+  setInterval(updateScanClock, 1000);
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var bar = document.getElementById('mp-progress-bar');
+    if(bar){
+      bar.addEventListener('click', function(e){
+        var audio = document.getElementById('bookAudio');
+        if(!audio || !audio.duration) return;
+        var rect = bar.getBoundingClientRect();
+        var pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        audio.currentTime = pct * audio.duration;
+        mpUpdateUI(audio);
+      });
+    }
+  });
+</script>
+</body>
+</html>
