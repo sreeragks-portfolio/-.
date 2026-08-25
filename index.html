@@ -44,19 +44,66 @@
 
   @media (prefers-reduced-motion: reduce){ .hint .chev{ animation:none; } }
 
-  /* ── MOBILE SCREEN (< 768px): hide book, show static page ── */
+  /* ── MOBILE SCREEN (< 768px): hide book, show paper card ── */
   #mobile-screen{
     display: none;
     position: fixed; inset: 0; z-index: 9999;
-    background: #F1EEE5;
+    background: #F8F7F6;
     align-items: center; justify-content: center;
-    flex-direction: column;
     overflow: hidden;
   }
-  #mobile-screen img{
-    max-width: 100%; max-height: 100%;
-    width: 100%; height: 100%;
-    object-fit: cover;
+  /* Ambient background warmth gradient */
+  #mobile-screen::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 35% 25%, rgba(255,250,235,0.55) 0%, transparent 55%),
+      radial-gradient(ellipse at 68% 78%, rgba(215,205,180,0.22) 0%, transparent 55%);
+  }
+  /* Hyper-realistic paper card */
+  #mobile-page-card{
+    position: relative;
+    width: 74vw;
+    max-width: 310px;
+    aspect-ratio: 3 / 4;
+    transform-origin: 50% 8%;
+    animation: mobileBreeze 5.8s ease-in-out infinite;
+    border-radius: 1px 2px 2px 1px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 1px  rgba(16,14,8,0.12),
+      0 3px 5px  rgba(16,14,8,0.11),
+      0 7px 14px rgba(16,14,8,0.10),
+      0 16px 32px rgba(16,14,8,0.08),
+      0 32px 56px rgba(16,14,8,0.06),
+      3px 10px 28px rgba(16,14,8,0.07),
+      -1px 4px 10px rgba(16,14,8,0.04);
+  }
+  #mobile-page-card img{
+    width:100%; height:100%; object-fit:cover;
+    display:block; position:relative; z-index:1;
+  }
+  /* Paper grain overlay */
+  #mobile-page-card .m-grain{
+    position:absolute; inset:0; z-index:2; pointer-events:none;
+    opacity:0.038; mix-blend-mode:multiply;
+    background-color:#7A6E58;
+    filter:url(#mobileGrain);
+  }
+  /* Edge vignette */
+  #mobile-page-card .m-vignette{
+    position:absolute; inset:0; z-index:3; pointer-events:none;
+    background:
+      linear-gradient(to right,  rgba(16,14,8,0.09) 0%, transparent 14%, transparent 86%, rgba(16,14,8,0.05) 100%),
+      linear-gradient(to bottom, rgba(16,14,8,0.04) 0%, transparent 10%, transparent 85%, rgba(16,14,8,0.10) 100%);
+  }
+  @keyframes mobileBreeze{
+    0%   { transform: rotate(0deg)     translateY(0px)    scale(1.0000); }
+    12%  { transform: rotate(0.65deg)  translateY(-2.5px) scale(1.0008); }
+    28%  { transform: rotate(0.25deg)  translateY(-0.8px) scale(1.0003); }
+    46%  { transform: rotate(-0.50deg) translateY(0.6px)  scale(0.9997); }
+    62%  { transform: rotate(0.40deg)  translateY(-2.0px) scale(1.0005); }
+    78%  { transform: rotate(-0.20deg) translateY(0.4px)  scale(1.0000); }
+    100% { transform: rotate(0deg)     translateY(0px)    scale(1.0000); }
   }
   @media (max-width: 767px){
     #mobile-screen{ display: flex; }
@@ -324,8 +371,22 @@
 <body>
 
 <!-- Mobile screen — shown only on phones (< 768px), replaces the book -->
+<!-- SVG grain filter for paper texture (hidden, referenced by CSS) -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none">
+  <defs>
+    <filter id="mobileGrain" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.72 0.68" numOctaves="4" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="gray"/>
+      <feBlend in="SourceGraphic" in2="gray" mode="multiply"/>
+    </filter>
+  </defs>
+</svg>
 <div id="mobile-screen">
-  <img src="assets/images/mobile-page.png" alt="Portfolio — Sreerag">
+  <div id="mobile-page-card">
+    <img src="assets/images/mobile-page.png" alt="Portfolio — Sreerag">
+    <div class="m-grain"></div>
+    <div class="m-vignette"></div>
+  </div>
 </div>
 
 <div class="loading" id="loading">PREPARING THE BOOK&hellip;</div>
