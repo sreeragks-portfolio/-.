@@ -536,6 +536,28 @@
   function markPageActivity(){ lastActivityTime = performance.now(); }
   ['mousemove','mousedown','wheel','touchstart','touchmove','keydown','scroll'].forEach(function(evt){
     window.addEventListener(evt, markPageActivity, { passive: true });
+  /* virtual-scroll: device-adaptive */
+  (function(){
+    function vc(v){return Math.max(0,Math.min(_vMax,v));}
+    window.addEventListener('wheel',function(e){
+      e.preventDefault();
+      var d=e.deltaY;
+      if(e.deltaMode===1)d*=16;else if(e.deltaMode===2)d*=window.innerHeight;
+      d=Math.sign(d)*Math.min(Math.abs(d),80);
+      _vTgt=vc(_vTgt+d);
+    },{passive:false});
+    var _tc=0;
+    window.addEventListener('touchstart',function(e){_tc=e.touches[0].clientY;},{passive:true});
+    window.addEventListener('touchmove',function(e){
+      var dy=_tc-e.touches[0].clientY;_tc=e.touches[0].clientY;
+      _vTgt=vc(_vTgt+dy*1.5);
+    },{passive:true});
+    window.addEventListener('keydown',function(e){
+      var s=e.key==='ArrowDown'||e.key===' '?80:e.key==='ArrowUp'?-80:
+        e.key==='PageDown'?window.innerHeight*0.5:e.key==='PageUp'?-window.innerHeight*0.5:0;
+      if(s)_vTgt=vc(_vTgt+s);
+    });
+  })();
   });
 
   var loadingEl = document.getElementById('loading');
@@ -550,10 +572,11 @@
   // doing it every animation frame while WebGL is also rendering every
   // frame was a real source of scroll stutter.
   var spacerHeight = 0;
-  var smoothY = 0;
+  var smoothY=window.scrollY||0,_vTgt=window.scrollY||0,_vMax=0;
   function layoutSpacer(){
     spacerHeight = TOTAL_UNITS * window.innerHeight * SCROLL_SCALE;
     spacerEl.style.height = spacerHeight + 'px';
+  _vMax=spacerHeight-window.innerHeight;
   }
   layoutSpacer();
 
@@ -1520,8 +1543,7 @@
   }
 
   function render(){
-    smoothY += (window.scrollY - smoothY) * 0.2;
-    computeTargets();
+    smoothY+=(_vTgt-smoothY)*0.10;    computeTargets();
 
     // ---- wind breeze scheduling: only ever runs while genuinely idle ----
     var breezeNow = performance.now();
