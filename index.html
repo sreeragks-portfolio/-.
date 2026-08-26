@@ -67,14 +67,6 @@
     aspect-ratio: 3 / 4;
     border-radius: 1px 2px 2px 1px;
     overflow: hidden;
-    box-shadow:
-      0 1px 1px  rgba(16,14,8,0.12),
-      0 3px 5px  rgba(16,14,8,0.11),
-      0 7px 14px rgba(16,14,8,0.10),
-      0 16px 32px rgba(16,14,8,0.08),
-      0 32px 56px rgba(16,14,8,0.06),
-      3px 10px 28px rgba(16,14,8,0.07),
-      -1px 4px 10px rgba(16,14,8,0.04);
   }
   #mobile-page-card img{
     width:100%; height:100%; object-fit:cover;
@@ -2892,7 +2884,7 @@
 </script>
 
 <script>
-/* Mobile — static card + card-edge ant-walker */
+/* Mobile — static card + vertical ant-walker near card sides */
 (function(){
   var scr=document.getElementById('mobile-screen');
   if(!scr||getComputedStyle(scr).display==='none') return;
@@ -2916,13 +2908,6 @@
   resize(); window.addEventListener('resize',resize);
   var INK='#241F1A',ANT_SCALE=1.37;
   var SDL={x:0.283,y:-0.958};
-  var WANDER=44;
-  function getCard(){
-    var w=window.innerWidth,h=window.innerHeight;
-    var cw=Math.min(w*0.74,310),ch=cw*(4/3);
-    var cl=(w-cw)/2,ct=(h-ch)/2;
-    return{l:cl,t:ct,r:cl+cw,b:ct+ch};
-  }
   function drawAnt(x,y,angle,legPhase){
     var dropPx=2.0*ANT_SCALE;
     var sx=x+SDL.x*dropPx,sy=y-SDL.y*dropPx;
@@ -2956,9 +2941,7 @@
     ctx.beginPath();ctx.ellipse(-3.3,0,2.9,1.95,0,0,Math.PI*2);ctx.fill();
     ctx.restore();
   }
-  function isExited(px,py,horiz,dir,c){
-    return horiz?(dir>0?px>c.r+40:px<c.l-40):(dir>0?py>c.b+40:py<c.t-40);
-  }
+  function isExited(py,dir){return dir>0?py>window.innerHeight+40:py<-40;}
   function angleLerp(a,b,t){
     var d=((b-a+Math.PI)%(Math.PI*2))-Math.PI;
     if(d<-Math.PI)d+=Math.PI*2;return a+d*t;
@@ -2979,25 +2962,23 @@
     return last;
   }
   function pickWalk(){
-    var c=getCard();
-    var edge=Math.floor(Math.random()*4),horiz=(edge===0||edge===1);
-    var dir=Math.random()<0.5?1:-1,cMin,cMax,x,y;
-    if(edge===0){cMin=c.t-WANDER;cMax=c.t+16;y=cMin+Math.random()*(cMax-cMin);x=dir>0?c.l-40:c.r+40;}
-    else if(edge===1){cMin=c.b-16;cMax=c.b+WANDER;y=cMin+Math.random()*(cMax-cMin);x=dir>0?c.l-40:c.r+40;}
-    else if(edge===2){cMin=c.l-WANDER;cMax=c.l+16;x=cMin+Math.random()*(cMax-cMin);y=dir>0?c.t-40:c.b+40;}
-    else{cMin=c.r-16;cMax=c.r+WANDER;x=cMin+Math.random()*(cMax-cMin);y=dir>0?c.t-40:c.b+40;}
-    var bh=horiz?(dir>0?0:Math.PI):(dir>0?Math.PI/2:-Math.PI/2);
-    var cr=Math.random(),ac=cr<0.42?1:cr<0.70?2:cr<0.88?3:4;
-    var spd=58+Math.random()*34,fols=[],cum=0;
-    for(var fi=1;fi<ac;fi++){cum+=(26+Math.random()*22)/spd;fols.push({delay:cum});}
-    return{x:x,y:y,horizontal:horiz,dir:dir,cMin:cMin,cMax:cMax,card:c,
+    var w=window.innerWidth,h=window.innerHeight;
+    var cw=Math.min(w*0.74,310),cl=(w-cw)/2;
+    var BAND=40,leftSide=Math.random()<0.5,cMin,cMax;
+    if(leftSide){cMin=cl-BAND;cMax=cl+14;}else{cMin=cl+cw-14;cMax=cl+cw+BAND;}
+    var x=cMin+Math.random()*(cMax-cMin);
+    var dir=Math.random()<0.5?1:-1,y=dir>0?-34:h+34;
+    var bh=dir>0?Math.PI/2:-Math.PI/2;
+    var cr=Math.random(),ac=cr<0.50?1:cr<0.78?2:3;
+    var spd=55+Math.random()*30,fols=[],cum=0;
+    for(var fi=1;fi<ac;fi++){cum+=(24+Math.random()*20)/spd;fols.push({delay:cum});}
+    return{x:x,y:y,dir:dir,cMin:cMin,cMax:cMax,
            speed:spd,heading:bh,headingOffset:0,
            wF1:0.28+Math.random()*0.22,wP1:Math.random()*Math.PI*2,
            wF2:0.7+Math.random()*0.5,wP2:Math.random()*Math.PI*2,
            followers:fols,history:[],legPhase:0,t:0};
   }
-  var ant=null,idleUntil=performance.now()+1000;
-  var lastTime=performance.now();
+  var ant=null,idleUntil=performance.now()+1000,lastTime=performance.now();
   function tick(now){
     var dt=Math.min((now-lastTime)/1000,0.05);lastTime=now;
     ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
@@ -3005,15 +2986,12 @@
       if(now>=idleUntil)ant=pickWalk();
     }else{
       ant.t+=dt;
-      var c=ant.card;
-      var bfwd=ant.horizontal?(ant.dir>0?0:Math.PI):(ant.dir>0?Math.PI/2:-Math.PI/2);
-      var perpNow=ant.horizontal?ant.y:ant.x;
+      var bfwd=ant.dir>0?Math.PI/2:-Math.PI/2;
       var mid=(ant.cMin+ant.cMax)/2,half=(ant.cMax-ant.cMin)/2;
-      var normP=half>0?(perpNow-mid)/half:0;
-      var k=ant.horizontal?1:-1;
-      var bOff=-normP*k*ant.dir*0.9;
-      var mean=0.5*Math.sin(ant.t*ant.wF1+ant.wP1)+0.32*Math.sin(ant.t*ant.wF2+ant.wP2);
-      var desOff=Math.max(-1.2,Math.min(1.2,bOff+mean));
+      var normP=half>0?(ant.x-mid)/half:0;
+      var bOff=normP*ant.dir*0.9;
+      var mean=0.3*Math.sin(ant.t*ant.wF1+ant.wP1)+0.18*Math.sin(ant.t*ant.wF2+ant.wP2);
+      var desOff=Math.max(-0.8,Math.min(0.8,bOff+mean));
       ant.headingOffset+=(desOff-ant.headingOffset)*Math.min(1,dt*1.6);
       ant.heading=bfwd+ant.headingOffset;
       ant.x+=Math.cos(ant.heading)*ant.speed*dt;
@@ -3022,18 +3000,18 @@
       ant.history.push({t:ant.t,x:ant.x,y:ant.y,heading:ant.heading,legPhase:ant.legPhase});
       var maxD=ant.followers.length?ant.followers[ant.followers.length-1].delay:0;
       while(ant.history.length>2&&ant.history[1].t<ant.t-maxD-0.5)ant.history.shift();
-      var lExit=isExited(ant.x,ant.y,ant.horizontal,ant.dir,c);
+      var lExit=isExited(ant.y,ant.dir);
       if(!lExit)drawAnt(ant.x,ant.y,ant.heading,ant.legPhase);
       ant.followers.forEach(function(f){
         var sT=ant.t-f.delay;if(sT<0)return;
         var s=sampleHistory(ant.history,sT);
-        if(!s||isExited(s.x,s.y,ant.horizontal,ant.dir,c))return;
+        if(!s||isExited(s.y,ant.dir))return;
         drawAnt(s.x,s.y,s.heading,s.legPhase);
       });
       var trST=ant.t-maxD,trExit=false;
       if(maxD===0){trExit=lExit;}
-      else if(trST>=0){var tr=sampleHistory(ant.history,trST);trExit=!!tr&&isExited(tr.x,tr.y,ant.horizontal,ant.dir,c);}
-      if((trST>=0&&trExit)||ant.t>60+maxD){ant=null;idleUntil=now+(8000+Math.random()*10000);}
+      else if(trST>=0){var tr=sampleHistory(ant.history,trST);trExit=!!tr&&isExited(tr.y,ant.dir);}
+      if((trST>=0&&trExit)||ant.t>60+maxD){ant=null;idleUntil=now+(6000+Math.random()*8000);}
     }
     requestAnimationFrame(tick);
   }
