@@ -79,13 +79,7 @@
     background-color:#7A6E58;
     filter:url(#mobileGrain);
   }
-  /* Edge vignette */
-  #mobile-page-card .m-vignette{
-    position:absolute; inset:0; z-index:3; pointer-events:none;
-    background:
-      linear-gradient(to right,  rgba(16,14,8,0.09) 0%, transparent 14%, transparent 86%, rgba(16,14,8,0.05) 100%),
-      linear-gradient(to bottom, rgba(16,14,8,0.04) 0%, transparent 10%, transparent 85%, rgba(16,14,8,0.10) 100%);
-  }
+
   @media (max-width: 767px){
     #mobile-screen{ display: flex; }
     #stage, #antLayer, .hint, #chapterTabs,
@@ -366,7 +360,6 @@
   <div id="mobile-page-card">
     <img src="assets/images/mobile-page.png" alt="Portfolio — Sreerag">
     <div class="m-grain"></div>
-    <div class="m-vignette"></div>
   </div>
 </div>
 
