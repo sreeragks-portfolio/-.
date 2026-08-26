@@ -62,8 +62,8 @@
   /* Hyper-realistic paper card */
   #mobile-page-card{
     position: relative;
-    width: 74vw;
-    max-width: 310px;
+    width: 81.4vw;
+    max-width: 341px;
     aspect-ratio: 3 / 4;
     border-radius: 1px 2px 2px 1px;
     overflow: hidden;
@@ -2952,7 +2952,7 @@
   function pickWalk(){
     var w=window.innerWidth,h=window.innerHeight;
     var leftSide=Math.random()<0.5;
-    var baseX=leftSide?Math.round(w*0.13):Math.round(w*0.87);
+    var cw=Math.min(w*0.814,341),cEdge=(w-cw)/2;var baseX=leftSide?Math.round(cEdge):Math.round(w-cEdge);
     var xRange=20,cMin=baseX-xRange,cMax=baseX+xRange;
     var x=baseX+(Math.random()-0.5)*xRange*2;
     var dir=Math.random()<0.5?1:-1,y=dir>0?-34:h+34;
