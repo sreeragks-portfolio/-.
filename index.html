@@ -550,6 +550,7 @@
   // doing it every animation frame while WebGL is also rendering every
   // frame was a real source of scroll stutter.
   var spacerHeight = 0;
+  var smoothY = 0;
   function layoutSpacer(){
     spacerHeight = TOTAL_UNITS * window.innerHeight * SCROLL_SCALE;
     spacerEl.style.height = spacerHeight + 'px';
@@ -1507,8 +1508,7 @@
   function computeTargets(){
     var vh = window.innerHeight;
     var maxScroll = spacerHeight - vh;
-    var y = window.scrollY;
-    var progress = maxScroll > 0 ? Math.min(Math.max(y/maxScroll, 0), 1) : 0;
+    var y = smoothY;    var progress = maxScroll > 0 ? Math.min(Math.max(y/maxScroll, 0), 1) : 0;
     var scaled = progress * TOTAL_UNITS;
 
     hintEl.style.opacity = progress > 0.03 ? '0' : '1';
@@ -1520,6 +1520,7 @@
   }
 
   function render(){
+    smoothY += (window.scrollY - smoothY) * 0.2;
     computeTargets();
 
     // ---- wind breeze scheduling: only ever runs while genuinely idle ----
