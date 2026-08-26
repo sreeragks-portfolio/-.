@@ -543,8 +543,11 @@
       e.preventDefault();
       var d=e.deltaY;
       if(e.deltaMode===1)d*=16;else if(e.deltaMode===2)d*=window.innerHeight;
-      d=Math.sign(d)*20*(1-Math.exp(-Math.abs(d)/25));
+      var isMouse=Math.abs(d)>=40;
+      d=isMouse?Math.sign(d)*35:d*0.65;
       _vTgt=vc(_vTgt+d);
+      if(_vTgt-smoothY>450)_vTgt=smoothY+450;
+      else if(smoothY-_vTgt>450)_vTgt=smoothY-450;
     },{passive:false});
     var _tc=0;
     window.addEventListener('touchstart',function(e){_tc=e.touches[0].clientY;},{passive:true});
@@ -1543,7 +1546,7 @@
   }
 
   function render(){
-    smoothY+=(_vTgt-smoothY)*0.08;    computeTargets();
+    var _s=(_vTgt-smoothY)*0.07;if(_s>16)_s=16;else if(_s<-16)_s=-16;smoothY+=_s;    computeTargets();
 
     // ---- wind breeze scheduling: only ever runs while genuinely idle ----
     var breezeNow = performance.now();
