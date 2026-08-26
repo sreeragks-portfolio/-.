@@ -536,26 +536,29 @@
   function markPageActivity(){ lastActivityTime = performance.now(); }
   ['mousemove','mousedown','wheel','touchstart','touchmove','keydown','scroll'].forEach(function(evt){
     window.addEventListener(evt, markPageActivity, { passive: true });
-  /* virtual-scroll: device-adaptive */
+  /* virtual-scroll: velocity+friction */
   (function(){
     function vc(v){return Math.max(0,Math.min(_vMax,v));}
     window.addEventListener('wheel',function(e){
       e.preventDefault();
       var d=e.deltaY;
       if(e.deltaMode===1)d*=16;else if(e.deltaMode===2)d*=window.innerHeight;
-      d=Math.sign(d)*Math.min(Math.abs(d),80);
-      _vTgt=vc(_vTgt+d);
+      d=Math.sign(d)*20*(1-Math.exp(-Math.abs(d)/25));
+      var now=performance.now(),dt=Math.min(Math.max(now-_wt,16),250);_wt=now;
+      d*=Math.min(dt/50,2);
+      _vVel+=d*0.12;
+      _vVel=Math.sign(_vVel)*Math.min(Math.abs(_vVel),12);
     },{passive:false});
     var _tc=0;
     window.addEventListener('touchstart',function(e){_tc=e.touches[0].clientY;},{passive:true});
     window.addEventListener('touchmove',function(e){
       var dy=_tc-e.touches[0].clientY;_tc=e.touches[0].clientY;
-      _vTgt=vc(_vTgt+dy*1.5);
+      _vVel+=dy*0.08;_vVel=Math.sign(_vVel)*Math.min(Math.abs(_vVel),12);
     },{passive:true});
     window.addEventListener('keydown',function(e){
-      var s=e.key==='ArrowDown'||e.key===' '?80:e.key==='ArrowUp'?-80:
-        e.key==='PageDown'?window.innerHeight*0.5:e.key==='PageUp'?-window.innerHeight*0.5:0;
-      if(s)_vTgt=vc(_vTgt+s);
+      var s=e.key==='ArrowDown'||e.key===' '?5:e.key==='ArrowUp'?-5:
+        e.key==='PageDown'?10:e.key==='PageUp'?-10:0;
+      if(s){_vVel=Math.sign(s)*Math.min(Math.abs(_vVel)+Math.abs(s),12);}
     });
   })();
   });
@@ -572,7 +575,7 @@
   // doing it every animation frame while WebGL is also rendering every
   // frame was a real source of scroll stutter.
   var spacerHeight = 0;
-  var smoothY=window.scrollY||0,_vTgt=window.scrollY||0,_vMax=0;
+  var smoothY=0,_vY=0,_vVel=0,_vMax=0,_wt=0;
   function layoutSpacer(){
     spacerHeight = TOTAL_UNITS * window.innerHeight * SCROLL_SCALE;
     spacerEl.style.height = spacerHeight + 'px';
@@ -1543,7 +1546,9 @@
   }
 
   function render(){
-    smoothY+=(_vTgt-smoothY)*0.10;    computeTargets();
+    _vVel*=0.85;
+    _vY=Math.max(0,Math.min(_vMax,_vY+_vVel));
+    smoothY=_vY;    computeTargets();
 
     // ---- wind breeze scheduling: only ever runs while genuinely idle ----
     var breezeNow = performance.now();
