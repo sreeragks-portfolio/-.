@@ -13,7 +13,7 @@
     --paper:#F8F7F6; --ink:#1A1A18; --ink-soft:#5B5B57; --signal:#2149C4;
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
-  html,body{ background:var(--paper); }
+  html,body{ background:var(--paper); overscroll-behavior:none; touch-action:none; }
   body{ font-family:'Space Grotesk', sans-serif; }
 
   #stage{ position:fixed; inset:0; z-index:1; }
@@ -2441,30 +2441,9 @@
 
   var scrollAnimFrame = null;
 
-  function animateScrollTo(targetY, fromScaled, toScaled){
-    if(scrollAnimFrame) cancelAnimationFrame(scrollAnimFrame);
-
-    if(reduceMotion){
-      window.scrollTo(0, targetY);
-      return;
-    }
-
-    var startY = window.scrollY;
-    var distanceUnits = Math.abs(toScaled - fromScaled);
-    var duration = Math.min(700 + distanceUnits * 260, 2400);
-    var startTime = performance.now();
-
-    function step(now){
-      var t = Math.min((now - startTime) / duration, 1);
-      var eased = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
-      window.scrollTo(0, startY + (targetY - startY) * eased);
-      if(t < 1){
-        scrollAnimFrame = requestAnimationFrame(step);
-      } else {
-        scrollAnimFrame = null;
-      }
-    }
-    scrollAnimFrame = requestAnimationFrame(step);
+  function animateScrollTo(targetY,fromScaled,toScaled){
+    if(mFrame){cancelAnimationFrame(mFrame);mFrame=null;}
+    _vTgt=vc(targetY);
   }
 
   function currentScaled(){
