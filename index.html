@@ -1526,6 +1526,7 @@
   }
 
   function onResize(){
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     fitCamera();
     layoutSpacer();
@@ -2445,7 +2446,7 @@
   var scrollAnimFrame = null;
 
   function animateScrollTo(targetY,fromScaled,toScaled){
-    if(mFrame){cancelAnimationFrame(mFrame);mFrame=null;}
+    if(scrollAnimFrame){cancelAnimationFrame(scrollAnimFrame);scrollAnimFrame=null;}
     _vTgt=vc(targetY);
   }
 
