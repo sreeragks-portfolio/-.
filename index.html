@@ -13,7 +13,7 @@
     --paper:#F8F7F6; --ink:#1A1A18; --ink-soft:#5B5B57; --signal:#2149C4;
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
-  html,body{ background:var(--paper); overscroll-behavior:none; touch-action:none; }
+  html,body{ background:var(--paper); overflow:hidden; overscroll-behavior:none; touch-action:none; }
   body{ font-family:'Space Grotesk', sans-serif; }
 
   #stage{ position:fixed; inset:0; z-index:1; }
@@ -550,11 +550,14 @@
       else if(smoothY-_vTgt>450)_vTgt=smoothY-450;
     },{passive:false});
     var _tc=0;
-    window.addEventListener('touchstart',function(e){_tc=e.touches[0].clientY;},{passive:true});
+    window.addEventListener('touchstart',function(e){e.preventDefault();_tc=e.touches[0].clientY;},{passive:false});
     window.addEventListener('touchmove',function(e){
+      e.preventDefault();
       var dy=_tc-e.touches[0].clientY;_tc=e.touches[0].clientY;
       _vTgt=vc(_vTgt+dy*1.2);
-    },{passive:true});
+      if(_vTgt-smoothY>450)_vTgt=smoothY+450;
+      else if(smoothY-_vTgt>450)_vTgt=smoothY-450;
+    },{passive:false});
     window.addEventListener('keydown',function(e){
       var s=e.key==='ArrowDown'||e.key===' '?80:e.key==='ArrowUp'?-80:
         e.key==='PageDown'?window.innerHeight*0.5:e.key==='PageUp'?-window.innerHeight*0.5:0;
@@ -1546,7 +1549,7 @@
   }
 
   function render(){
-    var _s=(_vTgt-smoothY)*0.07;if(_s>16)_s=16;else if(_s<-16)_s=-16;smoothY+=_s;    computeTargets();
+    var _s=(_vTgt-smoothY)*0.10;if(_s>22)_s=22;else if(_s<-22)_s=-22;smoothY+=_s;    computeTargets();
 
     // ---- wind breeze scheduling: only ever runs while genuinely idle ----
     var breezeNow = performance.now();
