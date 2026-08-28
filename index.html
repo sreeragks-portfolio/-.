@@ -473,6 +473,13 @@
   // Skip all Three.js / book init on mobile — the #mobile-screen div handles it
   if(window.innerWidth < 768){ return; }
 
+  // Safari/CDN guard: if three.js failed to load, bail out cleanly
+  if(typeof THREE === 'undefined'){
+    var _ld=document.getElementById('loading');
+    if(_ld){_ld.style.opacity='0';setTimeout(function(){_ld.style.display='none';},500);}
+    return;
+  }
+
   // ---------- content ----------
   var PAGES = [
     { front: {}, back: {} },  // leaf 0  — cover
@@ -931,11 +938,22 @@
   // MSAA *as well* roughly quadruples the fragment work for no visible
   // benefit and is a common source of scroll/animation jank on laptops.
   var pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  var renderer = new THREE.WebGLRenderer({
-    antialias: pixelRatio < 1.5,
-    powerPreference: 'high-performance',
-    alpha: false
-  });
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({
+      antialias: pixelRatio < 1.5,
+      powerPreference: 'high-performance',
+      alpha: false
+    });
+  } catch(e) {
+    // powerPreference may fail on some Safari versions — retry without it
+    try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false }); }
+    catch(e2) {
+      var _ld2=document.getElementById('loading');
+      if(_ld2){_ld2.style.opacity='0';setTimeout(function(){_ld2.style.display='none';},500);}
+      return;
+    }
+  }
   renderer.shadowMap.enabled = false;
   renderer.setPixelRatio(pixelRatio);
   stageEl.appendChild(renderer.domElement);
@@ -2536,7 +2554,7 @@
     drawGutterShadow(ctx, w, h, side === 'front' ? 'left' : 'right');
     var tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy()
     return tex;
   }
 
