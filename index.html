@@ -1603,6 +1603,10 @@ if(typeof THREE==='undefined'){
 
   function render(){
     var _s=(_vTgt-smoothY)*0.10;if(_s>22)_s=22;else if(_s<-22)_s=-22;smoothY+=_s;    computeTargets();
+    // Keep the chapter-tab active indicator in sync with the virtual scroll
+    // position.  The native 'scroll' event never fires (overflow:hidden), so
+    // we drive it from here instead — the queued helper debounces to once/frame.
+    queueActiveTabUpdate();
 
     // ---- wind breeze scheduling: only ever runs while genuinely idle ----
     var breezeNow = performance.now();
@@ -2529,12 +2533,20 @@ if(typeof THREE==='undefined'){
     if(scrollAnimFrame){cancelAnimationFrame(scrollAnimFrame);scrollAnimFrame=null;}
     // vc() is scoped inside the wheel-listener IIFE — inline the clamp here
     _vTgt=Math.max(0,Math.min(_vMax,targetY));
+    // The render loop caps movement at 22 px/frame, so a large jump would take
+    // many seconds to complete.  Mirror the 450 px "max delta" window that the
+    // wheel handler applies so programmatic nav feels just as snappy.
+    var delta=_vTgt-smoothY;
+    if(delta>450)smoothY=_vTgt-450;
+    else if(delta<-450)smoothY=_vTgt+450;
   }
 
   function currentScaled(){
     var vh = window.innerHeight;
     var maxScroll = spacerHeight - vh;
-    var progress = maxScroll > 0 ? Math.min(Math.max(window.scrollY / maxScroll, 0), 1) : 0;
+    // Use smoothY (virtual scroll position), NOT window.scrollY which is always
+    // 0 because html/body has overflow:hidden — the page never actually scrolls.
+    var progress = maxScroll > 0 ? Math.min(Math.max(smoothY / maxScroll, 0), 1) : 0;
     return progress * TOTAL_UNITS;
   }
 
