@@ -7,7 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script
+<script>
+// Fallback: if cdnjs failed (content-blocker, DNS, etc.) try jsdelivr
+if(typeof THREE==='undefined'){
+  document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/scr'+'ipt>');
+}
+</script>>
 <style>
   :root{
     --paper:#F8F7F6; --ink:#1A1A18; --ink-soft:#5B5B57; --signal:#2149C4;
@@ -44,6 +50,21 @@
 
   @media (prefers-reduced-motion: reduce){ .hint .chev{ animation:none; } }
 
+
+  /* ── DESKTOP FALLBACK: shown when WebGL / Three.js unavailable ── */
+  #desktop-fallback{
+    display:none; position:fixed; top:0;right:0;bottom:0;left:0; z-index:9999;
+    background:var(--paper); align-items:center; justify-content:center;
+    flex-direction:column; gap:24px;
+  }
+  #desktop-fallback img{
+    max-width:340px; width:60vw; border-radius:2px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  }
+  #desktop-fallback .fb-msg{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    color:var(--ink-soft); text-align:center; max-width:360px; line-height:1.7;
+  }
   /* ── MOBILE SCREEN (< 768px): hide book, show paper card ── */
   #mobile-screen{
     display: none;
@@ -84,7 +105,7 @@
     #mobile-screen{ display: flex; }
     #stage, #antLayer, .hint, #chapterTabs,
     #scanOverlay, #handContainer, #handDismiss,
-    #nowPlaying, .loading, .spacer, footer.end{ display: none !important; }
+    #nowPlaying, .loading, .spacer, footer.end, #desktop-fallback{ display: none !important; }
   }
 
 
@@ -363,6 +384,11 @@
   </div>
 </div>
 
+<div id="desktop-fallback">
+  <img src="assets/images/front-coverpage-top.webp" alt="Sreerag KS — Portfolio">
+  <p class="fb-msg">Your browser doesn't support 3D rendering.<br>Try Chrome, Firefox, or Edge for the full interactive experience.</p>
+</div>
+
 <div class="loading" id="loading">PREPARING THE BOOK&hellip;</div>
 <div id="stage"></div>
 <canvas id="antLayer" aria-hidden="true"></canvas>
@@ -477,6 +503,9 @@
   if(typeof THREE === 'undefined'){
     var _ld=document.getElementById('loading');
     if(_ld){_ld.style.opacity='0';setTimeout(function(){_ld.style.display='none';},500);}
+    var _fb=document.getElementById('desktop-fallback');
+    if(_fb){_fb.style.display='flex';}
+    document.querySelector('.hint').style.display='none';
     return;
   }
 
@@ -951,6 +980,9 @@
     catch(e2) {
       var _ld2=document.getElementById('loading');
       if(_ld2){_ld2.style.opacity='0';setTimeout(function(){_ld2.style.display='none';},500);}
+      var _fb2=document.getElementById('desktop-fallback');
+      if(_fb2){_fb2.style.display='flex';}
+      document.querySelector('.hint').style.display='none';
       return;
     }
   }
