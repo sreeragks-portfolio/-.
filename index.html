@@ -1338,7 +1338,8 @@ if(typeof THREE==='undefined'){
         var parts = key.split('-');
         var leafIdx = parseInt(parts[0]);
         var side = parts[1];
-        if(leafIdx === QR_LEAF_INDEX && side === QR_SIDE){ total--; return; }
+        // page-30.webp now shows directly — QR overlay removed
+        // if(leafIdx === QR_LEAF_INDEX && side === QR_SIDE){ total--; return; }
         var img = new Image();
         img.onload = function(){
           applyTextureToFace(leafIdx, side, textureFromImageExact(img));
@@ -1348,7 +1349,7 @@ if(typeof THREE==='undefined'){
         img.src = IMAGE_MAP[key];
       })(keys[k]);
     }
-    loadQRPageExact();
+    // loadQRPageExact();  // disabled — page-30.webp shows directly now
   }
 
   function loadQRPageExact(){
