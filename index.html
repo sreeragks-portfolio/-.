@@ -2527,7 +2527,8 @@ if(typeof THREE==='undefined'){
 
   function animateScrollTo(targetY,fromScaled,toScaled){
     if(scrollAnimFrame){cancelAnimationFrame(scrollAnimFrame);scrollAnimFrame=null;}
-    _vTgt=vc(targetY);
+    // vc() is scoped inside the wheel-listener IIFE — inline the clamp here
+    _vTgt=Math.max(0,Math.min(_vMax,targetY));
   }
 
   function currentScaled(){
