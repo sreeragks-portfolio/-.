@@ -133,6 +133,48 @@ if(typeof THREE==='undefined'){
     .chapter-tab{ font-size:9px; padding:10px 5px; }
   }
 
+  /* ── Works hover sub-menu ───────────────────────── */
+  .chapter-tab-wrap{ position:relative; display:flex; }
+
+  /* Vertical stack that slides out to the LEFT of the Works tab */
+  .chapter-submenu{
+    position:absolute; right:calc(100% + 6px); top:0;
+    display:flex; flex-direction:column; gap:3px;
+    writing-mode:horizontal-tb;
+    opacity:0; pointer-events:none;
+    transform:translateX(10px);
+    transition:opacity 0.22s ease, transform 0.22s ease;
+    z-index:16;
+  }
+  .chapter-tab-wrap:hover .chapter-submenu{
+    opacity:1; pointer-events:auto; transform:translateX(0);
+  }
+
+  /* Each chip mirrors the .chapter-tab aesthetic */
+  .chapter-submenu-item{
+    font-family:'IBM Plex Mono', monospace;
+    background:#EAE6D9; color:#5B5B57;
+    border:1px solid #D3CDB9; border-right:none;
+    padding:12px 9px; cursor:pointer;
+    border-radius:3px 0 0 3px;
+    box-shadow:-2px 2px 5px rgba(20,19,15,0.10);
+    transition:transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:3px;
+  }
+  .chapter-submenu-item:hover{
+    transform:translateX(-5px);
+    background:#F1EEE1; color:#1A1A18;
+  }
+  .chapter-submenu-item .s-name{
+    font-size:9px; letter-spacing:0.09em; white-space:nowrap;
+  }
+  .chapter-submenu-item .s-type{
+    font-size:7.5px; letter-spacing:0.11em; color:#9B9A94;
+    text-transform:uppercase; white-space:nowrap;
+  }
+  .chapter-submenu-item:hover .s-type{ color:var(--ink-soft); }
+
   /* ── SCAN button ─────────────────────────────────── */
   #scanOverlay{
     position:fixed; bottom:6vh; left:50%; transform:translateX(-50%);
@@ -2582,22 +2624,55 @@ if(typeof THREE==='undefined'){
     });
   }
 
-  function initChapterTabs(){
-    var rail = document.getElementById('chapterTabs');
-    NAV_POINTS.forEach(function(p){
-      var btn = document.createElement('button');
-      btn.className = 'chapter-tab';
-      btn.textContent = p.label;
-      btn.addEventListener('click', function(){
-        var from = currentScaled();
-        animateScrollTo(scrollYForScaled(p.scaled), from, p.scaled);
-      });
-      rail.appendChild(btn);
-      chapterTabEls.push(btn);
+  var WORKS_ITEMS = [
+  { name:'Coexistens',                      type:'Typeface'   },
+  { name:'WHO',                             type:'Awareness'  },
+  { name:'Ecofold',                         type:'Packaging'  },
+  { name:'Paradox of spiralling stillness', type:''           },
+  { name:'The curation of time',            type:''           },
+  { name:'Arike',                           type:'Hauding'    },
+  { name:'Chindha',                         type:'Literature' },
+];
+
+function initChapterTabs(){
+  var rail = document.getElementById('chapterTabs');
+  NAV_POINTS.forEach(function(p){
+    var wrap = document.createElement('div');
+    wrap.className = 'chapter-tab-wrap';
+    var btn = document.createElement('button');
+    btn.className = 'chapter-tab';
+    btn.textContent = p.label;
+    btn.addEventListener('click', function(){
+      var from = currentScaled();
+      animateScrollTo(scrollYForScaled(p.scaled), from, p.scaled);
     });
-    window.addEventListener('scroll', queueActiveTabUpdate, { passive:true });
-    updateActiveTab();
-  }
+    wrap.appendChild(btn);
+    if(p.label === 'Works'){
+      var sub = document.createElement('div');
+      sub.className = 'chapter-submenu';
+      WORKS_ITEMS.forEach(function(item){
+        var row = document.createElement('div');
+        row.className = 'chapter-submenu-item';
+        var nameEl = document.createElement('span');
+        nameEl.className = 's-name';
+        nameEl.textContent = item.name;
+        row.appendChild(nameEl);
+        if(item.type){
+          var typeEl = document.createElement('span');
+          typeEl.className = 's-type';
+          typeEl.textContent = item.type;
+          row.appendChild(typeEl);
+        }
+        sub.appendChild(row);
+      });
+      wrap.appendChild(sub);
+    }
+    rail.appendChild(wrap);
+    chapterTabEls.push(btn);
+  });
+  window.addEventListener('scroll', queueActiveTabUpdate, { passive:true });
+  updateActiveTab();
+}
 
 
   function drawImageCover(ctx, img, w, h){
