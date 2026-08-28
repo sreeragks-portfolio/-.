@@ -623,7 +623,7 @@ if(typeof THREE==='undefined'){
       var d=e.deltaY;
       if(e.deltaMode===1)d*=16;else if(e.deltaMode===2)d*=window.innerHeight;
       var isMouse=Math.abs(d)>=40;
-      d=isMouse?Math.sign(d)*100:d*0.65;
+      d=isMouse?Math.sign(d)*75:d*0.65;
       _vTgt=vc(_vTgt+d);
       if(_vTgt-smoothY>450)_vTgt=smoothY+450;
       else if(smoothY-_vTgt>450)_vTgt=smoothY-450;
@@ -1644,7 +1644,7 @@ if(typeof THREE==='undefined'){
   }
 
   function render(){
-    var _s=(_vTgt-smoothY)*0.10;if(_s>22)_s=22;else if(_s<-22)_s=-22;smoothY+=_s;    computeTargets();
+    var _s=(_vTgt-smoothY)*0.10;if(_s>30)_s=30;else if(_s<-30)_s=-30;smoothY+=_s;    computeTargets();
     // Keep the chapter-tab active indicator in sync with the virtual scroll
     // position.  The native 'scroll' event never fires (overflow:hidden), so
     // we drive it from here instead — the queued helper debounces to once/frame.
