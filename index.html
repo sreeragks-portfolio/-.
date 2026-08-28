@@ -623,7 +623,7 @@ if(typeof THREE==='undefined'){
       var d=e.deltaY;
       if(e.deltaMode===1)d*=16;else if(e.deltaMode===2)d*=window.innerHeight;
       var isMouse=Math.abs(d)>=40;
-      d=isMouse?Math.sign(d)*35:d*0.65;
+      d=isMouse?Math.sign(d)*100:d*0.65;
       _vTgt=vc(_vTgt+d);
       if(_vTgt-smoothY>450)_vTgt=smoothY+450;
       else if(smoothY-_vTgt>450)_vTgt=smoothY-450;
