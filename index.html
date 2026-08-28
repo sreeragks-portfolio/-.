@@ -549,8 +549,8 @@ if(typeof THREE==='undefined'){
   // reading. Any real interaction (scroll, click, drag, key, touch) resets
   // the idle clock immediately and fades an in-progress gust out fast.
   var BREEZE_IDLE_SECONDS = 6;      // seconds of no interaction before wind can pick up
-  var BREEZE_LIFT = 0.34;           // world-unit z-lift at the free (outer) edge at full gust strength (one-directional, see breezeLift01)
-  var BREEZE_CURL = 0.17;           // extra inward curl at the free edge, as a fraction of PAGE_W
+  var BREEZE_LIFT = 0.12;           // world-unit z-lift at the free (outer) edge at full gust strength (one-directional, see breezeLift01)
+  var BREEZE_CURL = 0.06;           // extra inward curl at the free edge, as a fraction of PAGE_W
   var breeze = {
     active: false,
     startTime: 0,
@@ -960,7 +960,7 @@ if(typeof THREE==='undefined'){
   var scene = new THREE.Scene();
   scene.background = new THREE.Color(0xF8F7F6);
 
-  var camera = new THREE.PerspectiveCamera(32, window.innerWidth/window.innerHeight, 0.1, 100);
+  var camera = new THREE.PerspectiveCamera(32, window.innerWidth/window.innerHeight, 0.1, 20);
 
   // On a HiDPI/Retina screen the canvas is already supersampled by the
   // pixel ratio below, which anti-aliases edges on its own -- turning on
@@ -972,11 +972,12 @@ if(typeof THREE==='undefined'){
     renderer = new THREE.WebGLRenderer({
       antialias: pixelRatio < 1.5,
       powerPreference: 'high-performance',
-      alpha: false
+      alpha: false,
+      logarithmicDepthBuffer: true
     });
   } catch(e) {
     // powerPreference may fail on some Safari versions — retry without it
-    try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false }); }
+    try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, logarithmicDepthBuffer: true }); }
     catch(e2) {
       var _ld2=document.getElementById('loading');
       if(_ld2){_ld2.style.opacity='0';setTimeout(function(){_ld2.style.display='none';},500);}
@@ -1227,7 +1228,7 @@ if(typeof THREE==='undefined'){
   // and so costs nothing in perspective terms. See the cover compensation
   // in render() for the one case a step this small could not survive on
   // its own.
-  var Z_GAP = 0.006;
+  var Z_GAP = 0.01;
   var Z_BOOST = 0.12;
 
   for(var i = 0; i < L; i++){
@@ -1768,7 +1769,7 @@ if(typeof THREE==='undefined'){
         // Not yet turned: the right-hand stack under the live leaf.
         rank = RANK_BASE - (i - frontRight);
       }
-      setPolygonOffset(g, -rank);
+      setPolygonOffset(g, -rank * 2);
       // Real depth separation, not just a GL polygon-offset hint: once two
       // leaves are both fully turned (c=1) they are LITERALLY coincident
       // geometry -- same rotation, same flat plane, zero bend. The actual
