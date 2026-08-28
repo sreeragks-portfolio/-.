@@ -1801,6 +1801,12 @@ if(typeof THREE==='undefined'){
       // gets. The cover's thickness then reads purely as thickness (its edge
       // faces), which is what it is meant to be.
       g.position.z = rank * Z_GAP - (g.userData.isCover ? COVER_THICKNESS / 2 : 0);
+      // renderOrder ensures pages are drawn back-to-front by stacking
+      // rank. Combined with selective depthWrite control below, this
+      // prevents the breeze-lifted page from visually overlapping the
+      // page in front of it even when BREEZE_LIFT >> Z_GAP.
+      g.renderOrder = rank;
+      g.children.forEach(function(mesh){ mesh.renderOrder = rank; });
 
       g.rotation.y = -Math.PI * c;
       if(!g.userData.isCover){
@@ -1856,6 +1862,28 @@ if(typeof THREE==='undefined'){
     bendQueue.forEach(function(item){
       var strength = item.i === frontRight ? breezeStrengthR : (item.i === frontLeft ? breezeStrengthL : 0);
       updateBend(item.g, item.c, item.dir, strength, breezeTime, item.i * 1.9 + 0.7);
+    });
+
+    // ---- depth-write gating for breeze ----
+    // When the breeze lifts a page, its vertices can move toward the
+    // camera well past the page in front of it (BREEZE_LIFT >> Z_GAP).
+    // Without this guard the GPU depth test lets the lifted page's
+    // fragments overwrite the front page's.
+    //
+    // Fix: turn OFF depthWrite on frontLeft while it flutters.
+    // renderOrder (set above) forces pages to draw back-to-front, so
+    // frontRight draws AFTER frontLeft. With depthWrite off on the
+    // lifted page, frontRight's fragments always pass the depth test
+    // and paint on top. depthWrite is restored when breeze fades.
+    leaves.forEach(function(g){
+      if(g.userData.isCover) return;
+      // Only suppress depthWrite on frontLeft — it's the page whose
+      // breeze lift overshoots frontRight.  frontRight is the top page
+      // and lifts freely toward the camera with nothing ahead of it.
+      var isBreezed = (g === leaves[frontLeft] && breezeStrengthL > 0.001);
+      g.children.forEach(function(mesh){
+        mesh.material.depthWrite = !isBreezed;
+      });
     });
 
     var openLocal = state[0].current;
