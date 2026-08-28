@@ -549,8 +549,8 @@ if(typeof THREE==='undefined'){
   // reading. Any real interaction (scroll, click, drag, key, touch) resets
   // the idle clock immediately and fades an in-progress gust out fast.
   var BREEZE_IDLE_SECONDS = 6;      // seconds of no interaction before wind can pick up
-  var BREEZE_LIFT = 0.34;           // world-unit z-lift at the free (outer) edge at full gust strength (one-directional, see breezeLift01)
-  var BREEZE_CURL = 0.17;           // extra inward curl at the free edge, as a fraction of PAGE_W
+  var BREEZE_LIFT = 0.48;           // world-unit z-lift at the free (outer) edge at full gust strength (one-directional, see breezeLift01)
+  var BREEZE_CURL = 0.24;           // extra inward curl at the free edge, as a fraction of PAGE_W
   var breeze = {
     active: false,
     startTime: 0,
