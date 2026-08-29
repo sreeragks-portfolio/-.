@@ -1644,7 +1644,7 @@ if(typeof THREE==='undefined'){
   }
 
   function render(){
-    var _s=(_vTgt-smoothY)*0.10;if(_s>22)_s=22;else if(_s<-22)_s=-22;if(Math.abs(_vTgt-smoothY)<1){smoothY=_vTgt;}else{smoothY+=_s;}    computeTargets();
+    var _s=(_vTgt-smoothY)*0.10;if(_s>22)_s=22;else if(_s<-22)_s=-22;if(Math.abs(_vTgt-smoothY)<1){smoothY=_vTgt;}else{smoothY+=_s;}    computeTargets();if(_vTgt===0){state[0].current=0;state[0].target=0;}
     // Keep the chapter-tab active indicator in sync with the virtual scroll
     // position.  The native 'scroll' event never fires (overflow:hidden), so
     // we drive it from here instead — the queued helper debounces to once/frame.
@@ -2583,7 +2583,7 @@ if(typeof THREE==='undefined'){
     else if(delta<-450)smoothY=_vTgt+450;
     // Snap cover: when jumping to Opening, force smoothY & leaf states
     // to avoid blank-back flash while cover leaf closes
-    if(_vTgt === 0){ state[0].current = 0; }
+    
   }
 
   function currentScaled(){
