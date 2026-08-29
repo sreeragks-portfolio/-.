@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script
 <script>
-// Fallback: if cdnjs failed (content-blocker, DNS, etc.) try jsdelivr
+// Fallback: if cdnjs failed (content-bocker, DNS, etc.) try jsdelivr
 if(typeof THREE==='undefined'){
   document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/scr'+'ipt>');
 }
@@ -2820,10 +2820,10 @@ function initChapterTabs(){
     // Guard: spacerHeight might be 0 on first load — recompute if needed
     if(spacerHeight <= 0) layoutSpacer();
     if(targetScroll < 0 || !isFinite(targetScroll)) targetScroll = 0;
-    window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    _vTgt = targetScroll;
 
     // ── Step 2: After scroll + easing settle, show hand ──────────────────
-    setTimeout(function(){
+    _scanTimer = setInterval(function(){ if(Math.abs(smoothY - targetScroll) < 2){ clearInterval(_scanTimer); _scanTimer = null;
       if(!_scanActive) return;
 
       if(scanBtn) scanBtn.textContent = 'SCANNING…';
@@ -2894,7 +2894,7 @@ function initChapterTabs(){
         }
       }, 2400);
 
-    }, 900); // wait for smooth scroll + Three.js easing to settle
+    } }, 60); // wait for smooth scroll + Three.js easing to settle
   };
 
   window.closeHandOverlay = function(){
