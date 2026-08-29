@@ -2583,7 +2583,7 @@ if(typeof THREE==='undefined'){
     else if(delta<-450)smoothY=_vTgt+450;
     // Snap cover: when jumping to Opening, force smoothY & leaf states
     // to avoid blank-back flash while cover leaf closes
-    if(_vTgt === 0){ smoothY = 0; computeTargets(); for(var i=0;i<state.length;i++) state[i].current = state[i].target; }
+    if(_vTgt === 0){ state[0].current = 0; }
   }
 
   function currentScaled(){
