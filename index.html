@@ -138,16 +138,16 @@ if(typeof THREE==='undefined'){
 
   /* Vertical stack that slides out to the LEFT of the Works tab */
   .chapter-submenu{
-    position:absolute; right:calc(100% + 6px); bottom:0;
+    position:absolute; right:calc(100% + 6px); top:50%;
     display:flex; flex-direction:column; gap:3px;
     writing-mode:horizontal-tb;
     opacity:0; pointer-events:none;
-    transform:translateX(10px);
+    transform:translateY(-50%) translateX(10px);
     transition:opacity 0.22s ease, transform 0.22s ease;
     z-index:16;
   }
   .chapter-tab-wrap:hover .chapter-submenu{
-    opacity:1; pointer-events:auto; transform:translateX(0);
+    opacity:1; pointer-events:auto; transform:translateY(-50%) translateX(0);
   }
 
   /* Each chip mirrors the .chapter-tab aesthetic */
