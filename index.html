@@ -1921,6 +1921,23 @@ if(typeof THREE==='undefined'){
     // frontRight draws AFTER frontLeft. With depthWrite off on the
     // lifted page, frontRight's fragments always pass the depth test
     // and paint on top. depthWrite is restored when breeze fades.
+    // When navigating back to Opening (_vTgt===0), the cover is clamped
+    // flat (rotation=0, showing PORTFOLIO front face) while inner pages
+    // are still mid-close.  A turning page's leading edge swings forward
+    // by up to PAGE_W (1.5) from its centre — far past the flat cover's
+    // z-position (only Z_GAP=0.01 apart in rank).  Without help the GPU
+    // depth test lets those closer fragments draw over the cover, making
+    // it look like a blank inner page is covering the PORTFOLIO image.
+    //
+    // Fix: suppress depthWrite on every inner page while they are still
+    // closing toward the front cover.  renderOrder already encodes the
+    // correct stacking (cover = highest), so with depthWrite off the
+    // cover draws last and its fragments always pass the depth test,
+    // painting over any mid-turn page that poked forward in z.  Once all
+    // pages settle to 0 and lie flat, the ordering is moot and the flag
+    // is harmless.  This is the same technique used for breeze-lifted
+    // pages below.
+    var closingToFront = (_vTgt === 0);
     leaves.forEach(function(g){
       if(g.userData.isCover) return;
       // Only suppress depthWrite on frontLeft — it's the page whose
@@ -1928,7 +1945,7 @@ if(typeof THREE==='undefined'){
       // and lifts freely toward the camera with nothing ahead of it.
       var isBreezed = (g === leaves[frontLeft] && breezeStrengthL > 0.001);
       g.children.forEach(function(mesh){
-        mesh.material.depthWrite = !isBreezed;
+        mesh.material.depthWrite = !(isBreezed || closingToFront);
       });
     });
 
