@@ -2669,15 +2669,15 @@ if(typeof THREE==='undefined'){
   }
 
   var WORKS_ITEMS = [
-  { name:'Coexistens',                      type:'Typeface'   },
-  { name:'WHO',                             type:'Awareness'  },
-  { name:'Ecofold',                         type:'Packaging'  },
-  { name:'Paradox of spiralling stillness', type:''           },
-  { name:'The curation of time',            type:''           },
+  { name:'Coexistens',                      type:'Typeface',   scaled: PAUSE + 9  },
+  { name:'WHO',                             type:'Awareness',  scaled: PAUSE + 15 },
+  { name:'Ecofold',                         type:'Packaging',  scaled: PAUSE + 17 },
+  { name:'Paradox of spiralling stillness', type:'',           scaled: PAUSE + 22 },
+  { name:'The curation of time',            type:'',           scaled: PAUSE + 23 },
   { name:'Arike',                           type:'Hauding'    },
   { name:'Chindha',                         type:'Literature' },
-  { name:'Offline',            type:'Branding' },
-  { name:'Malayala Manorama',  type:'Campaign' },
+  { name:'Offline',                         type:'Branding'   },
+  { name:'Malayala Manorama',               type:'Campaign'   },
 ];
 
 function initChapterTabs(){
@@ -2709,7 +2709,14 @@ function initChapterTabs(){
           typeEl.textContent = item.type;
           row.appendChild(typeEl);
         }
-        sub.appendChild(row);
+                row.style.cursor = 'pointer';
+        if(item.scaled !== undefined){
+          row.addEventListener('click', function(){
+            var from = currentScaled();
+            animateScrollTo(scrollYForScaled(item.scaled), from, item.scaled);
+          });
+        }
+sub.appendChild(row);
       });
       wrap.appendChild(sub);
     }
