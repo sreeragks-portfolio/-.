@@ -2636,7 +2636,28 @@ if(typeof THREE==='undefined'){
     return progress * TOTAL_UNITS;
   }
 
-  var chapterTabEls = [];
+    /* Keyboard navigation: flip one leaf at a time */
+  document.addEventListener('keydown', function(e){
+    var k = e.key;
+    var fwd = k==='ArrowUp'||k==='ArrowRight'||k==='PageUp';
+    var bwd = k==='ArrowDown'||k==='ArrowLeft'||k==='PageDown';
+    if(!fwd && !bwd) return;
+    e.preventDefault();
+    var from = currentScaled();
+    var to;
+    if(fwd){
+      to = Math.ceil(from + 0.05);
+      if(to <= Math.round(from)) to = Math.round(from) + 1;
+      to = Math.min(to, TOTAL_UNITS);
+    } else {
+      to = Math.floor(from - 0.05);
+      if(to >= Math.round(from)) to = Math.round(from) - 1;
+      to = Math.max(to, 0);
+    }
+    animateScrollTo(scrollYForScaled(to), from, to);
+  });
+
+var chapterTabEls = [];
   var activeTabIdx = -1;
 
   function updateActiveTab(){
