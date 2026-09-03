@@ -1711,6 +1711,7 @@ if(typeof THREE==='undefined'){
       var s = state[i];
       var ease = reduceMotion ? 1 : (g.userData.isCover ? EASE_COVER : EASE);
       s.current = lerp(s.current, s.target, ease);
+      if(Math.abs(s.current - s.target) < 0.005) s.current = s.target;
 
       var delta = s.current - s.prev;
       if(Math.abs(delta) > 0.0004){
