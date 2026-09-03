@@ -1399,10 +1399,11 @@ if(typeof THREE==='undefined'){
         var isFront = mesh.material.side === THREE.FrontSide;
         var key = i + (isFront ? '-front' : '-back');
         if(!IMAGE_MAP[key]){
-          mesh.material.transparent = true;
-          mesh.material.opacity     = 0;
-          mesh.material.depthWrite  = false;
-          mesh.material.needsUpdate = true;
+          // Fully remove from rendering + shadow system so no ghost
+          // outline or depth artefact remains (opacity:0 is not enough).
+          mesh.visible        = false;
+          mesh.castShadow     = false;
+          mesh.receiveShadow  = false;
         }
       });
     });
@@ -2857,12 +2858,12 @@ sub.appendChild(row);
         if((side === 'front') === isFront){
           if(mesh.material.map) mesh.material.map.dispose();
           mesh.material.map = tex;
-          // If this was a transparent mobile face (no image before),
-          // make it visible now that an image has been assigned.
-          if(mesh.material.transparent && mesh.material.opacity === 0){
-            mesh.material.transparent = false;
-            mesh.material.opacity     = 1;
-            mesh.material.depthWrite  = true;
+          // If this face was hidden (mobile page, no prior image),
+          // restore it now that an image has been assigned.
+          if(!mesh.visible){
+            mesh.visible       = true;
+            mesh.castShadow    = true;
+            mesh.receiveShadow = true;
           }
           mesh.material.needsUpdate = true;
         }
@@ -2898,9 +2899,8 @@ sub.appendChild(row);
             oldBack.dispose();
           } else {
             g.children.forEach(function(mesh){
-              // Skip transparent mobile faces — they have no image and the
-              // paper texture would be invisible anyway (opacity = 0).
-              if(mesh.material.transparent && mesh.material.opacity === 0) return;
+              // Skip hidden mobile faces — they have no image assigned yet.
+              if(!mesh.visible) return;
               var isFront = mesh.material.side === THREE.FrontSide;
               var tex = mesh.material.map;
               var newTex = makeTexture(isFront ? PAGES[i].front : PAGES[i].back, isFront ? 'left' : 'right');
