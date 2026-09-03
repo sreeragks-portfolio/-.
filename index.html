@@ -1373,44 +1373,12 @@ if(typeof THREE==='undefined'){
     '23-back':  'assets/images/page-44.webp',
     '24-front': 'assets/images/page-45.webp',
     '24-back':  'assets/images/page-46.webp',
-    // Leaves 25-36 (pages 47-70) are the mobile project section.
-    // Add entries here when real Figma designs are ready, e.g.:
-    //   '25-front': 'assets/images/page-47.webp',
-    // Until then these leaves stay transparent (see initMobileTransparency).
       '37-front': 'assets/images/back-coverpage-top.webp',
       '37-back':  'assets/images/back-coverpage-bottom.webp'
   };
 
   var QR_CODE_IMAGE = 'assets/images/qrcode.webp';
 
-  // Mobile project leaf indices (25-36 = pages 47-70).
-  // Any face in this set with no IMAGE_MAP entry renders fully transparent —
-  // blank placeholder slots vanish completely instead of showing white paper.
-  // Add an IMAGE_MAP entry for a face and it becomes visible automatically.
-  var MOBILE_LEAVES = {25:true,26:true,27:true,28:true,29:true,30:true,
-                       31:true,32:true,33:true,34:true,35:true,36:true};
-
-  // Apply transparency to every mobile face that has no assigned image.
-  // Runs here, after both IMAGE_MAP and the leaves[] array are ready.
-  (function initMobileTransparency(){
-    leaves.forEach(function(g, i){
-      if(!MOBILE_LEAVES[i] || g.userData.isCover) return;
-      g.children.forEach(function(mesh){
-        var isFront = mesh.material.side === THREE.FrontSide;
-        var key = i + (isFront ? '-front' : '-back');
-        if(!IMAGE_MAP[key]){
-          // Invisible but geometry stays in the book so pages still flip.
-          // Shadows disabled too — they were what caused the ghost outline.
-          mesh.material.transparent = true;
-          mesh.material.opacity     = 0;
-          mesh.material.depthWrite  = false;
-          mesh.material.needsUpdate = true;
-          mesh.castShadow           = false;
-          mesh.receiveShadow        = false;
-        }
-      });
-    });
-  })();
 
 
   function textureFromImageExact(img){
@@ -2861,15 +2829,6 @@ sub.appendChild(row);
         if((side === 'front') === isFront){
           if(mesh.material.map) mesh.material.map.dispose();
           mesh.material.map = tex;
-          // If this was a transparent mobile face, make it fully visible
-          // now that an image has been assigned.
-          if(mesh.material.transparent && mesh.material.opacity === 0){
-            mesh.material.transparent = false;
-            mesh.material.opacity     = 1;
-            mesh.material.depthWrite  = true;
-            mesh.castShadow           = true;
-            mesh.receiveShadow        = true;
-          }
           mesh.material.needsUpdate = true;
         }
       });
@@ -2904,8 +2863,6 @@ sub.appendChild(row);
             oldBack.dispose();
           } else {
             g.children.forEach(function(mesh){
-              // Skip transparent mobile faces — no image assigned, invisible.
-              if(mesh.material.transparent && mesh.material.opacity === 0) return;
               var isFront = mesh.material.side === THREE.FrontSide;
               var tex = mesh.material.map;
               var newTex = makeTexture(isFront ? PAGES[i].front : PAGES[i].back, isFront ? 'left' : 'right');
