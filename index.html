@@ -1028,7 +1028,7 @@ if(typeof THREE==='undefined'){
   // pixel ratio below, which anti-aliases edges on its own -- turning on
   // MSAA *as well* roughly quadruples the fragment work for no visible
   // benefit and is a common source of scroll/animation jank on laptops.
-  var pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  var pixelRatio = Math.max(Math.min(window.devicePixelRatio || 1, 2), 1.5);
   var renderer;
   try {
     renderer = new THREE.WebGLRenderer({
@@ -1681,7 +1681,7 @@ if(typeof THREE==='undefined'){
   }
 
   function onResize(){
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    renderer.setPixelRatio(Math.max(Math.min(window.devicePixelRatio||1,2),1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     fitCamera();
     layoutSpacer();
@@ -2110,7 +2110,7 @@ if(typeof THREE==='undefined'){
     var canvas = document.getElementById('antLayer');
     if(!canvas) return;
     var ctx = canvas.getContext('2d');
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var dpr = Math.max(Math.min(window.devicePixelRatio || 1, 2), 1.5);
 
     function resizeAntCanvas(){
       canvas.width = Math.round(window.innerWidth * dpr);
@@ -3189,7 +3189,7 @@ sub.appendChild(row);
   cv.style.zIndex='10001';cv.style.pointerEvents='none';
   document.body.appendChild(cv);
   var ctx=cv.getContext('2d');
-  var dpr=Math.min(window.devicePixelRatio||1,2);
+  var dpr=Math.max(Math.min(window.devicePixelRatio||1,2),1.5);
   function resize(){
     cv.width=Math.round(window.innerWidth*dpr);
     cv.height=Math.round(window.innerHeight*dpr);
