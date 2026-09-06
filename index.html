@@ -1850,6 +1850,8 @@ if(typeof THREE==='undefined'){
       if(state[fi].target < 1){ frontRight = fi; break; }
     }
     var frontLeft = frontRight === -1 ? (L - 1) : (frontRight > 0 ? frontRight - 1 : -1);
+    // Lazy-load textures for pages near the current view
+    lazyLoadNearby(frontRight >= 0 ? frontRight : L - 1);
     // ---- SCAN button: fade in AFTER QR leaf passes 90° (page 30 visible), vanish BEFORE next leaf hits 90° ----
     var scanOverlayEl = document.getElementById('scanOverlay');
     if(scanOverlayEl && !_scanActive){
@@ -1876,9 +1878,7 @@ if(typeof THREE==='undefined'){
     // long book -- e.g. the front cover's own single flip swung its
     // g.position.z by up to (L-1)*Z_GAP, which under this scene's
     // perspective camera reads as the page swelling larger and popping
-    // toward    // Lazy-load textures for pages near the current view
-    lazyLoadNearby(frontRight >= 0 ? frontRight : L - 1);
- the viewer rather than turning in place: the "detached from
+    // toward the viewer rather than turning in place: the "detached from
     // the binding" look. Bounding every leaf's OWN swing to one Z_GAP,
     // regardless of its index, removes that popping entirely -- the page
     // stays pinned to the spine and only ever turns.
