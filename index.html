@@ -1425,35 +1425,83 @@ if(typeof THREE==='undefined'){
   }
 
 
-  // ---------- UNIFIED IMAGE LOADER ----------
+  // ---------- LAZY IMAGE LOADER ----------
+  // Instead of downloading all ~78 images at once (which blocks bandwidth
+  // and delays the first meaningful paint), we load in priority tiers:
+  //   1. Cover + first 3 leaves (immediate — what the user sees on load)
+  //   2. Nearby leaves (±4 around the current page, triggered each frame)
+  //   3. Everything else (background fill once nearby pages are done)
+  var _imageStatus = {};          // key → 'loading' | 'loaded' | 'failed'
+  var _lazyQueue = [];            // keys waiting for background load
+  var _lazyBgRunning = false;
+  var _lastLazyLeaf = -1;         // avoids redundant work each frame
+  var LAZY_PRELOAD_AHEAD = 4;     // how many leaves ahead/behind to preload
+  var LAZY_BG_BATCH = 3;          // images to kick off per background tick
+
+  function _loadImageKey(key){
+    if(_imageStatus[key]) return;  // already loading or loaded
+    _imageStatus[key] = 'loading';
+    var parts = key.split('-');
+    var leafIdx = parseInt(parts[0]);
+    var side = parts[1];
+    var img = new Image();
+    img.onload = function(){
+      applyTextureToFace(leafIdx, side, textureFromImageExact(img));
+      _imageStatus[key] = 'loaded';
+    };
+    img.onerror = function(){
+      _imageStatus[key] = 'failed';
+      console.warn('[Portfolio] Image failed to load:', IMAGE_MAP[key]);
+    };
+    img.src = IMAGE_MAP[key];
+  }
+
+  function _loadLeaf(leafIdx){
+    var fk = leafIdx + '-front';
+    var bk = leafIdx + '-back';
+    if(IMAGE_MAP[fk]) _loadImageKey(fk);
+    if(IMAGE_MAP[bk]) _loadImageKey(bk);
+  }
+
+  // Called from render() — loads nearby leaves around the current page
+  function lazyLoadNearby(currentLeaf){
+    if(currentLeaf === _lastLazyLeaf) return;
+    _lastLazyLeaf = currentLeaf;
+    var start = Math.max(0, currentLeaf - LAZY_PRELOAD_AHEAD);
+    var end = Math.min(L - 1, currentLeaf + LAZY_PRELOAD_AHEAD);
+    for(var i = start; i <= end; i++){
+      _loadLeaf(i);
+    }
+    // Once nearby pages are loaded, start background fill for the rest
+    if(!_lazyBgRunning) _startBackgroundLoad();
+  }
+
+  function _startBackgroundLoad(){
+    _lazyBgRunning = true;
+    var allKeys = Object.keys(IMAGE_MAP);
+    _lazyQueue = allKeys.filter(function(k){ return !_imageStatus[k]; });
+    _tickBackgroundLoad();
+  }
+
+  function _tickBackgroundLoad(){
+    if(_lazyQueue.length === 0){ _lazyBgRunning = false; return; }
+    // Load a small batch, then yield to keep the main thread responsive
+    var batch = _lazyQueue.splice(0, LAZY_BG_BATCH);
+    for(var i = 0; i < batch.length; i++){
+      _loadImageKey(batch[i]);
+    }
+    setTimeout(_tickBackgroundLoad, 200);
+  }
+
+  // Initial priority load: cover + first few leaves
   function loadAllPageImages(){
-    var keys = Object.keys(IMAGE_MAP);
-    var total = keys.length;
-    var loaded = 0;
-    var failed = 0;
-    function onDone(success, src){
-      if(success) loaded++; else { failed++; console.warn('[Portfolio] Image failed to load:', src); }
-      if(loaded + failed === total && failed > 0){
-        console.error('[Portfolio] ' + failed + '/' + total + ' images failed. Check that your assets/images/ folder is committed to GitHub.');
-      }
-    }
-    for(var k = 0; k < keys.length; k++){
-      (function(key){
-        var parts = key.split('-');
-        var leafIdx = parseInt(parts[0]);
-        var side = parts[1];
-        // page-30.webp now shows directly — QR overlay removed
-        // if(leafIdx === QR_LEAF_INDEX && side === QR_SIDE){ total--; return; }
-        var img = new Image();
-        img.onload = function(){
-          applyTextureToFace(leafIdx, side, textureFromImageExact(img));
-          onDone(true, img.src);
-        };
-        img.onerror = function(){ onDone(false, IMAGE_MAP[key]); };
-        img.src = IMAGE_MAP[key];
-      })(keys[k]);
-    }
-    // loadQRPageExact();  // disabled — page-30.webp shows directly now
+    // Priority 1: front cover (leaf 0) — what the user sees immediately
+    _loadLeaf(0);
+    // Priority 2: first few content leaves
+    for(var i = 1; i <= 3 && i < L; i++) _loadLeaf(i);
+    // Priority 3: back cover
+    _loadLeaf(L - 1);
+    // Remaining pages load lazily via lazyLoadNearby() in the render loop
   }
 
   function loadQRPageExact(){
@@ -1828,7 +1876,9 @@ if(typeof THREE==='undefined'){
     // long book -- e.g. the front cover's own single flip swung its
     // g.position.z by up to (L-1)*Z_GAP, which under this scene's
     // perspective camera reads as the page swelling larger and popping
-    // toward the viewer rather than turning in place: the "detached from
+    // toward    // Lazy-load textures for pages near the current view
+    lazyLoadNearby(frontRight >= 0 ? frontRight : L - 1);
+ the viewer rather than turning in place: the "detached from
     // the binding" look. Bounding every leaf's OWN swing to one Z_GAP,
     // regardless of its index, removes that popping entirely -- the page
     // stays pinned to the spine and only ever turns.
