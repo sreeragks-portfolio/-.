@@ -1413,18 +1413,20 @@ if(typeof THREE==='undefined'){
 
 
   function textureFromImageExact(img){
-    var w = 2048, h = Math.round(2048 * (PAGE_H / PAGE_W));
+    // 1024px is sharp enough for the on-screen page size (typically ~500-600px
+    // at 2x DPR). Halving from 2048 cuts GPU memory per texture by 75% and
+    // makes each upload dramatically faster — critical during the background
+    // loading phase where dozens of textures stream in.
+    var w = 1024, h = Math.round(1024 * (PAGE_H / PAGE_W));
     var canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     var ctx = canvas.getContext('2d');
     drawImageCover(ctx, img, w, h);
     var tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
-    // Without this a page viewed at an angle (which is most of them, mid
-    // page-turn or receding into the stack) samples the texture with no
-    // anisotropic filtering at all (default is 1x) and reads noticeably
-    // softer than the same page viewed flat-on.
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    // Cap anisotropy at 4x — higher values (up to 16x on some GPUs) are very
+    // expensive on integrated GPUs and the visual difference past 4x is minimal.
+    tex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
     return tex;
   }
 
@@ -1440,7 +1442,7 @@ if(typeof THREE==='undefined'){
   var _lazyBgRunning = false;
   var _lastLazyLeaf = -1;         // avoids redundant work each frame
   var LAZY_PRELOAD_AHEAD = 4;     // how many leaves ahead/behind to preload
-  var LAZY_BG_BATCH = 3;          // images to kick off per background tick
+  var LAZY_BG_BATCH = 1;          // images to kick off per background tick (keep low to avoid jank)
 
   function _loadImageKey(key){
     if(_imageStatus[key]) return;  // already loading or loaded
@@ -1487,14 +1489,19 @@ if(typeof THREE==='undefined'){
     _tickBackgroundLoad();
   }
 
+  var _scheduleIdle = window.requestIdleCallback
+    ? function(fn){ requestIdleCallback(fn, { timeout: 1200 }); }
+    : function(fn){ setTimeout(fn, 600); };
+
   function _tickBackgroundLoad(){
     if(_lazyQueue.length === 0){ _lazyBgRunning = false; return; }
-    // Load a small batch, then yield to keep the main thread responsive
+    // Load one image, then yield to the browser — requestIdleCallback waits
+    // for a genuine idle gap so texture uploads don't compete with rendering.
     var batch = _lazyQueue.splice(0, LAZY_BG_BATCH);
     for(var i = 0; i < batch.length; i++){
       _loadImageKey(batch[i]);
     }
-    setTimeout(_tickBackgroundLoad, 200);
+    _scheduleIdle(_tickBackgroundLoad);
   }
 
   // Initial priority load: cover + first few leaves
@@ -1555,7 +1562,7 @@ if(typeof THREE==='undefined'){
 
       var tex = new THREE.CanvasTexture(canvas);
       tex.needsUpdate = true;
-      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      tex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
       applyTextureToFace(QR_LEAF_INDEX, QR_SIDE, tex);
     };
     img.src = QR_CODE_IMAGE;
