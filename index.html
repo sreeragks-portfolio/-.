@@ -3360,5 +3360,29 @@ sub.appendChild(row);
   requestAnimationFrame(tick);
 })();
 </script>
+<script>
+// Register service worker for offline caching & faster repeat visits
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').then(function(reg){
+      console.log('[Portfolio] Service worker registered, scope:', reg.scope);
+    }).catch(function(err){
+      console.warn('[Portfolio] SW registration failed:', err);
+    });
+  });
+}
+</script>
+<script>
+// Register service worker for offline caching & faster repeat visits
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js').then(function(reg){
+      console.log('[Portfolio] Service worker registered, scope:', reg.scope);
+    }).catch(function(err){
+      console.warn('[Portfolio] SW registration failed:', err);
+    });
+  });
+}
+</script>
 </body>
 </html>
