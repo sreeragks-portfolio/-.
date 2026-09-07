@@ -1619,12 +1619,39 @@ if(typeof THREE==='undefined'){
     mat.opacity = 0.7 * flutter;
   }
 
+  function resetToFlat(group){
+    var geo = group.userData.geo;
+    var base = group.userData.basePos;
+    var pos = geo.attributes.position.array;
+    for(var v = 0; v < pos.length; v += 3){
+      pos[v]   = base[v];
+      pos[v+1] = base[v+1];
+      pos[v+2] = base[v+2];
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+    group.userData.bentDirty = false;
+  }
+
   function updateBend(group, local, dir, breezeStrength, breezeTime, seed){
     var geo = group.userData.geo;
     var base = group.userData.basePos;
     var arc = reduceMotion ? 0 : Math.sin(local * Math.PI);
     var pos = geo.attributes.position.array;
     var hasBreeze = breezeStrength > 0.0005;
+
+    // Skip work for leaves that are fully flat and have no breeze —
+    // on a 39-leaf book this avoids ~35 unnecessary vertex loops + normal
+    // recomputes per frame, which is the main source of jank on weaker GPUs.
+    var isFlat = arc < 0.001 && !hasBreeze;
+    if(isFlat){
+      if(group.userData.bentDirty){
+        resetToFlat(group);
+      }
+      return;
+    }
+    group.userData.bentDirty = true;
+
     for(var v = 0; v < pos.length; v += 3){
       var t = base[v] / PAGE_W;
       var hump = Math.sin(t * Math.PI * 0.85);
@@ -1853,8 +1880,7 @@ if(typeof THREE==='undefined'){
     // Lazy-load textures for pages near the current view
     lazyLoadNearby(frontRight >= 0 ? frontRight : L - 1);
     // ---- SCAN button: fade in AFTER QR leaf passes 90° (page 30 visible), vanish BEFORE next leaf hits 90° ----
-    var scanOverlayEl = document.getElementById('scanOverlay');
-    if(scanOverlayEl && !_scanActive){
+    if(_scanOverlayEl && !_scanActive){
       var t1 = Math.max(0, Math.min(1, state[QR_LEAF_INDEX].current)); // 0→1 as QR leaf flips
       var t2 = Math.max(0, Math.min(1, state[QR_LEAF_INDEX+1].current)); // 0→1 as next leaf flips
       // fadeIn  ramps 0→1 over the second half of QR leaf's flip (90°→180°, page 30 revealed)
@@ -1862,8 +1888,8 @@ if(typeof THREE==='undefined'){
       // fadeOut ramps 1→0 over the first half of next leaf's flip (0°→90°)
       var fadeOut = Math.max(0, Math.min(1, 1 - t2 / 0.5));
       var scanOpacity = Math.min(fadeIn, fadeOut);
-      scanOverlayEl.style.opacity = scanOpacity.toFixed(3);
-      scanOverlayEl.style.pointerEvents = scanOpacity > 0.15 ? 'auto' : 'none';
+      _scanOverlayEl.style.opacity = scanOpacity.toFixed(3);
+      _scanOverlayEl.style.pointerEvents = scanOpacity > 0.15 ? 'auto' : 'none';
     }
 
 
@@ -2138,6 +2164,7 @@ if(typeof THREE==='undefined'){
 
   function start(){
     onResize();
+    _scanOverlayEl = document.getElementById('scanOverlay');
     loadingEl.style.opacity = '0';
     setTimeout(function(){ loadingEl.style.display = 'none'; }, 500);
     requestAnimationFrame(render);
@@ -2966,6 +2993,7 @@ sub.appendChild(row);
 
   // ---- SCAN interaction ----
   var _scanActive = false;
+  var _scanOverlayEl = null;  // cached DOM ref, set in start()
   var _scanTimer  = null;
 
   window.triggerScan = function(){
