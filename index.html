@@ -7,13 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script
-<script
-// Fallback: if cdnjs failed (content-bocker, DNS, etc.) try jsdelivr
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Fallback: if cdnjs failed (content-blocker, DNS, etc.) try jsdelivr
 if(typeof THREE==='undefined'){
   document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/scr'+'ipt>');
 }
-</script>>
+</script>
 <style>
   :root{
     --paper:#F8F7F6; --ink:#1A1A18; --ink-soft:#5B5B57; --signal:#2149C4;
@@ -641,7 +641,8 @@ if(typeof THREE==='undefined'){
     window.addEventListener('wheel',function(e){
       e.preventDefault();
       var d=e.deltaY;
-      if(e.deltaMode===1)d*=16;else if(e.deltaMode===2)d*=window.innerHeight;
+      // Firefox uses deltaMode 1 (lines) for mouse wheel; normalize to pixels
+      if(e.deltaMode===1)d*=32;else if(e.deltaMode===2)d*=window.innerHeight;
       var isMouse=Math.abs(d)>=40;
       d=isMouse?Math.sign(d)*100:d*0.65;
       _vTgt=vc(_vTgt+d);
@@ -649,9 +650,13 @@ if(typeof THREE==='undefined'){
       else if(smoothY-_vTgt>450)_vTgt=smoothY-450;
     },{passive:false});
     var _tc=0;
-    window.addEventListener('touchstart',function(e){e.preventDefault();_tc=e.touches[0].clientY;},{passive:false});
+    window.addEventListener('touchstart',function(e){
+      if(e.touches.length>0){_tc=e.touches[0].clientY;}
+      e.preventDefault();
+    },{passive:false});
     window.addEventListener('touchmove',function(e){
       e.preventDefault();
+      if(e.touches.length===0) return;
       var dy=_tc-e.touches[0].clientY;_tc=e.touches[0].clientY;
       _vTgt=vc(_vTgt+dy*1.2);
       if(_vTgt-smoothY>450)_vTgt=smoothY+450;
@@ -1034,12 +1039,11 @@ if(typeof THREE==='undefined'){
     renderer = new THREE.WebGLRenderer({
       antialias: pixelRatio < 1.5,
       powerPreference: 'high-performance',
-      alpha: false,
-      logarithmicDepthBuffer: true
+      alpha: false
     });
   } catch(e) {
     // powerPreference may fail on some Safari versions — retry without it
-    try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, logarithmicDepthBuffer: true }); }
+    try { renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false }); }
     catch(e2) {
       var _ld2=document.getElementById('loading');
       if(_ld2){_ld2.style.opacity='0';setTimeout(function(){_ld2.style.display='none';},500);}
