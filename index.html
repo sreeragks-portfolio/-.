@@ -459,57 +459,54 @@ if(typeof THREE==='undefined'){
 <script>
 // Record load start time for minimum display duration
 window.__loadStart = performance.now();
-// Loading percentage counter — smooth climb with realistic feel
+// Loading percentage counter — ticks up 1% at a time, never jumps
 (function(){
   var el=document.getElementById('ls-pct');
   if(!el)return;
-  var current=0;       // displayed value (float for smoothness)
-  var target=0;        // where we're heading
-  var phase=0;         // 0=initial ramp, 1=scene ready, 2=done
-  var startTime=performance.now();
+  var current=0;        // currently displayed number
+  var finishing=false;   // true once scene is ready
 
-  // Phase 0: climb through milestones on a schedule so it always feels active
-  // Each milestone = [time_ms, target_pct]
-  var milestones=[
-    [0,0],[200,8],[500,18],[900,28],[1400,38],
-    [2000,48],[2800,58],[3800,67],[5000,74],
-    [7000,80],[10000,85],[15000,88],[25000,90]
-  ];
-
-  function getMilestoneTarget(elapsed){
-    for(var i=milestones.length-1;i>=0;i--){
-      if(elapsed>=milestones[i][0]) return milestones[i][1];
+  // Schedule the next +1 increment
+  function scheduleNext(){
+    if(current>=100) return;
+    // Vary the delay so it feels organic:
+    //  0-30%  → fast (40-70ms each, ~1.5s total)
+    // 30-60%  → medium (70-120ms each, ~3s total)
+    // 60-85%  → slower (120-200ms each, ~4s total)
+    // 85-90%  → crawl (250-400ms each, slowing down)
+    // 90-100% → only when finishing, fast again (30-50ms)
+    var delay;
+    if(finishing && current>=90){
+      delay=30+Math.random()*20;
+    } else if(current<30){
+      delay=40+Math.random()*30;
+    } else if(current<60){
+      delay=70+Math.random()*50;
+    } else if(current<85){
+      delay=120+Math.random()*80;
+    } else {
+      // 85-90: slow crawl, pause longer the closer to 90
+      delay=250+Math.random()*150+(current-85)*30;
     }
-    return 0;
+    setTimeout(step,delay);
   }
 
-  // Smooth interpolation — lerp toward target each frame
-  function tick(){
-    if(phase===2) return;
-    var elapsed=performance.now()-startTime;
-    if(phase===0) target=getMilestoneTarget(elapsed);
-    // Lerp speed: faster when gap is large, always smooth
-    var speed=phase===1?0.18:0.08;
-    current+=(target-current)*speed;
-    // Prevent showing same number too long — always inch forward
-    if(phase===0 && current<target-0.5) current=Math.max(current,current+0.05);
-    var display=Math.min(Math.round(current),phase===1?100:90);
-    el.textContent=display+'%';
-    if(phase===1 && display>=100){
-      phase=2;
-      return;
-    }
-    requestAnimationFrame(tick);
+  function step(){
+    // Don't go past 90 until scene is ready
+    if(current>=90 && !finishing) return;
+    current++;
+    el.textContent=current+'%';
+    if(current>=100) return;
+    scheduleNext();
   }
-  requestAnimationFrame(tick);
 
-  // Called by start() — smoothly ramp to 100% instead of jumping
+  scheduleNext();
+
+  // Called by start() — unlock 90→100 and finish fast
   window.__finishLoading=function(){
-    target=100;
-    phase=1;
-    if(phase===2) return; // already done
-    // Ensure tick loop is running
-    requestAnimationFrame(tick);
+    finishing=true;
+    // If stuck waiting at 90, kick it forward
+    if(current>=90 && current<100) scheduleNext();
   };
 })();
 </script>
