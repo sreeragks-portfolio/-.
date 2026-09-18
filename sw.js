@@ -2,7 +2,7 @@
 // Cache-first for static assets (images, audio, THREE.js)
 // Network-first for HTML (so updates are picked up quickly)
 
-var CACHE_VERSION = 'portfolio-v9';
+var CACHE_VERSION = 'portfolio-v10';
 var STATIC_CACHE = CACHE_VERSION + '-static';
 var IMAGE_CACHE  = CACHE_VERSION + '-images';
 
